@@ -1,34 +1,32 @@
 "use client";
 
-/* Absolutely-positioned decorative shapes — aria-hidden, pointer-events-none */
-const SHAPES = [
-  { content: "✦", color: "#FF3AF2", size: "text-3xl", top: "8%",  left: "3%",  anim: "animate-mx-float",     delay: "0s"    },
-  { content: "✦", color: "#00F5D4", size: "text-xl",  top: "15%", left: "92%", anim: "animate-mx-float-rev", delay: "0.5s"  },
-  { content: "◆", color: "#FFE600", size: "text-2xl", top: "32%", left: "96%", anim: "animate-mx-wiggle",    delay: "0s"    },
-  { content: "✦", color: "#7B2FFF", size: "text-4xl", top: "55%", left: "1%",  anim: "animate-mx-float",     delay: "1s"    },
-  { content: "◆", color: "#FF6B35", size: "text-xl",  top: "70%", left: "94%", anim: "animate-mx-float-rev", delay: "0.8s"  },
-  { content: "★", color: "#FF3AF2", size: "text-2xl", top: "85%", left: "4%",  anim: "animate-mx-wiggle",    delay: "0.3s"  },
-  { content: "✦", color: "#00F5D4", size: "text-xl",  top: "92%", left: "89%", anim: "animate-mx-bounce",    delay: "1.2s"  },
-  { content: "◆", color: "#FFE600", size: "text-3xl", top: "45%", left: "97%", anim: "animate-mx-float",     delay: "0.6s"  },
+/* Subtle ambient background accents — aria-hidden, pointer-events-none.
+   Soft, low-opacity brand-tone blobs (no neon) to keep the premium SaaS feel. */
+const BLOBS = [
+  { color: "#6B3AC6", size: 260, top: "-4%",  left: "-3%",  anim: "animate-mx-float",     delay: "0s"   },
+  { color: "#9F7AEA", size: 180, top: "12%",  left: "88%",  anim: "animate-mx-float-rev", delay: "0.6s" },
+  { color: "#C960D4", size: 220, top: "72%",  left: "90%",  anim: "animate-mx-float",     delay: "1s"   },
+  { color: "#7134C9", size: 200, top: "82%",  left: "-4%",  anim: "animate-mx-float-rev", delay: "0.3s" },
 ] as const;
 
 export function FloatingDecorations() {
   return (
-    <div className="pointer-events-none select-none" aria-hidden="true">
-      {SHAPES.map((s, i) => (
+    <div className="pointer-events-none select-none overflow-hidden fixed inset-0" aria-hidden="true">
+      {BLOBS.map((b, i) => (
         <span
           key={i}
-          className={`absolute ${s.size} ${s.anim} opacity-70`}
+          className={`absolute rounded-full ${b.anim}`}
           style={{
-            color: s.color,
-            top: s.top,
-            left: s.left,
-            animationDelay: s.delay,
-            filter: `drop-shadow(0 0 8px ${s.color}88)`,
+            width: b.size,
+            height: b.size,
+            top: b.top,
+            left: b.left,
+            background: b.color,
+            opacity: 0.06,
+            filter: "blur(60px)",
+            animationDelay: b.delay,
           }}
-        >
-          {s.content}
-        </span>
+        />
       ))}
     </div>
   );

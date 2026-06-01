@@ -24,7 +24,14 @@ export function Dropzone({ onDrop, pending }: DropzoneProps) {
   const handleDrop = useCallback((accepted: File[]) => onDrop(accepted), [onDrop]);
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: handleDrop,
-    accept: { "application/pdf": [".pdf"], "text/plain": [".txt"] },
+    accept: {
+      "application/pdf": [".pdf"],
+      "text/plain": [".txt"],
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
+      "text/csv": [".csv"],
+      "text/markdown": [".md"],
+      "text/html": [".html", ".htm"],
+    },
     multiple: true,
   });
 
@@ -45,7 +52,7 @@ export function Dropzone({ onDrop, pending }: DropzoneProps) {
           <p className="text-xs font-semibold text-[#1A1A1A]">
             {isDragActive ? "Drop to upload" : "Upload documents"}
           </p>
-          <p className="text-[10px] text-[#AAAAAA] mt-0.5">PDF, TXT · drag & drop or click</p>
+          <p className="text-[10px] text-[#AAAAAA] mt-0.5">PDF, DOCX, CSV, MD, HTML, TXT</p>
         </div>
       </div>
 

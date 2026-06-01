@@ -223,14 +223,25 @@ export function Message({ message }: { message: ChatMessage }) {
                           {children}
                         </code>
                       ) : (
-                        <SyntaxHighlighter
-                          style={oneLight as Record<string, React.CSSProperties>}
-                          language={match[1]}
-                          PreTag="div"
-                          className="!rounded-xl !text-xs !my-2 !border !border-[#E2E2E2]"
-                        >
-                          {String(children).replace(/\n$/, "")}
-                        </SyntaxHighlighter>
+                        <div className="relative group/code">
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(String(children).replace(/\n$/, ""));
+                            }}
+                            className="absolute top-2 right-2 opacity-0 group-hover/code:opacity-100 p-1 rounded bg-[#F3F3F3] hover:bg-[#E8E8E8] transition-all text-[#888888] hover:text-[#1A1A1A]"
+                            aria-label="Copy code"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </button>
+                          <SyntaxHighlighter
+                            style={oneLight as Record<string, React.CSSProperties>}
+                            language={match[1]}
+                            PreTag="div"
+                            className="!rounded-xl !text-xs !my-2 !border !border-[#E2E2E2]"
+                          >
+                            {String(children).replace(/\n$/, "")}
+                          </SyntaxHighlighter>
+                        </div>
                       );
                     },
                   }}

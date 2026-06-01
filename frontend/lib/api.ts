@@ -1,5 +1,6 @@
 import type {
   AdminStats,
+  AdminUsage,
   ChatRequest,
   ChatResponse,
   Document,
@@ -188,6 +189,12 @@ export async function adminLogin(email: string, password: string): Promise<strin
 
 export async function fetchAdminStats(token: string): Promise<AdminStats> {
   return apiFetch<AdminStats>("/analytics/stats", {
+    headers: authHeader(token),
+  });
+}
+
+export async function fetchUsage(token: string): Promise<AdminUsage> {
+  return apiFetch<AdminUsage>("/analytics/usage", {
     headers: authHeader(token),
   });
 }

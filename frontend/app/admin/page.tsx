@@ -6,11 +6,10 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip,
   ResponsiveContainer,
 } from "recharts";
-import { LogOut, Download, MessageSquare, CheckCircle, TrendingUp, Activity } from "lucide-react";
-import { adminLogin, fetchAdminStats, fetchGaps, gapsExportUrl } from "@/lib/api";
-import type { AdminStats, GapItem } from "@/lib/types";
-
-// ── Auth gate ─────────────────────────────────────────────────────────────────
+import { motion, AnimatePresence } from "framer-motion";
+import { LogOut, Download, MessageSquare, CheckCircle, TrendingUp, Activity, Coins, Hash } from "lucide-react";
+import { adminLogin, fetchAdminStats, fetchGaps, fetchUsage, gapsExportUrl } from "@/lib/api";
+import type { AdminStats, AdminUsage, GapItem } from "@/lib/types";
 
 function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
   const [email, setEmail] = useState("");
@@ -34,8 +33,13 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#EBEBEB]">
-      <div className="w-full max-w-sm bg-white rounded-2xl border border-[#E2E2E2] shadow-sm p-8">
+    <div className="min-h-screen flex items-center justify-center bg-[#EBEBEB] p-4">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="w-full max-w-sm bg-white rounded-2xl border border-[#E2E2E2] shadow-sm p-8"
+      >
         <div className="mb-6">
           <h1 className="text-xl font-semibold text-[#1A1A1A]">Admin Dashboard</h1>
           <p className="text-sm text-[#888888] mt-1">Sign in with your admin credentials</p>
@@ -57,21 +61,30 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
             className="w-full px-3 py-2.5 rounded-xl border border-[#E2E2E2] text-sm bg-[#FAFAFA] focus:outline-none focus:ring-2 focus:ring-[#6B3AC6]/20 focus:border-[#6B3AC6] transition-all"
             required
           />
-          {error && <p className="text-xs text-red-500">{error}</p>}
+          <AnimatePresence>
+            {error && (
+              <motion.p
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="text-xs text-red-500"
+              >
+                {error}
+              </motion.p>
+            )}
+          </AnimatePresence>
           <button
             type="submit"
             disabled={loading}
             className="w-full py-2.5 rounded-xl bg-[#6B3AC6] text-white text-sm font-medium hover:bg-[#5B2DB8] transition-colors disabled:opacity-60"
           >
-            {loading ? "Signing in…" : "Sign in"}
+            {loading ? "Signing in" : "Sign in"}
           </button>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 }
-
-// ── Stat card ─────────────────────────────────────────────────────────────────
 
 function StatCard({
   label,
@@ -87,7 +100,12 @@ function StatCard({
   color: string;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-[#E2E2E2] p-5 shadow-sm">
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      className="bg-white rounded-2xl border border-[#E2E2E2] p-5 shadow-sm"
+    >
       <div className="flex items-start justify-between mb-3">
         <p className="text-xs font-medium text-[#888888] uppercase tracking-wider">{label}</p>
         <div className="p-2 rounded-xl" style={{ background: `${color}15` }}>
@@ -96,11 +114,9 @@ function StatCard({
       </div>
       <p className="text-2xl font-semibold text-[#1A1A1A]">{value}</p>
       {sub && <p className="text-xs text-[#AAAAAA] mt-1">{sub}</p>}
-    </div>
+    </motion.div>
   );
 }
-
-// ── Gap table ─────────────────────────────────────────────────────────────────
 
 function GapTable({ gaps, token }: { gaps: GapItem[]; token: string }) {
   return (
@@ -134,7 +150,7 @@ function GapTable({ gaps, token }: { gaps: GapItem[]; token: string }) {
       {gaps.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-[#AAAAAA]">
           <CheckCircle className="h-8 w-8 mb-2 text-emerald-400" />
-          <p className="text-sm">No gaps detected — great coverage!</p>
+          <p className="text-sm">No gaps detected - great coverage!</p>
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -149,14 +165,17 @@ function GapTable({ gaps, token }: { gaps: GapItem[]; token: string }) {
             </thead>
             <tbody>
               {gaps.map((g, i) => (
-                <tr
+                <motion.tr
                   key={g.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: i * 0.02 }}
                   className={`border-b border-[#F8F8F8] hover:bg-[#FAFAFA] transition-colors ${i === gaps.length - 1 ? "border-b-0" : ""}`}
                 >
                   <td className="px-5 py-3 text-[#1A1A1A] max-w-xs truncate">{g.question}</td>
                   <td className="px-4 py-3">
                     {g.is_refusal ? (
-                      <span className="text-[#AAAAAA] text-xs">—</span>
+                      <span className="text-[#AAAAAA] text-xs">-</span>
                     ) : (
                       <span
                         className="text-xs font-medium"
@@ -185,7 +204,7 @@ function GapTable({ gaps, token }: { gaps: GapItem[]; token: string }) {
                   <td className="px-4 py-3 text-xs text-[#AAAAAA]">
                     {new Date(g.created_at).toLocaleDateString()}
                   </td>
-                </tr>
+                </motion.tr>
               ))}
             </tbody>
           </table>
@@ -195,13 +214,12 @@ function GapTable({ gaps, token }: { gaps: GapItem[]; token: string }) {
   );
 }
 
-// ── Dashboard ─────────────────────────────────────────────────────────────────
-
 const CONFIDENCE_COLORS = { High: "#16A34A", Medium: "#D97706", Low: "#DC2626" };
 const FEEDBACK_COLORS = ["#6B3AC6", "#E2E2E2"];
 
 function Dashboard({ token, onLogout }: { token: string; onLogout: () => void }) {
   const [stats, setStats] = useState<AdminStats | null>(null);
+  const [usage, setUsage] = useState<AdminUsage | null>(null);
   const [gaps, setGaps] = useState<GapItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -210,8 +228,13 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
     setLoading(true);
     setError("");
     try {
-      const [s, g] = await Promise.all([fetchAdminStats(token), fetchGaps(token)]);
+      const [s, u, g] = await Promise.all([
+        fetchAdminStats(token),
+        fetchUsage(token),
+        fetchGaps(token),
+      ]);
       setStats(s);
+      setUsage(u);
       setGaps(g);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to load";
@@ -229,10 +252,11 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
       <div className="min-h-screen flex items-center justify-center bg-[#EBEBEB]">
         <div className="flex gap-1.5">
           {[0, 1, 2].map((i) => (
-            <div
+            <motion.div
               key={i}
-              className="h-2 w-2 rounded-full bg-[#6B3AC6] animate-bounce"
-              style={{ animationDelay: `${i * 0.15}s` }}
+              className="h-2 w-2 rounded-full bg-[#6B3AC6]"
+              animate={{ y: [0, -8, 0] }}
+              transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
             />
           ))}
         </div>
@@ -264,7 +288,6 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
 
   return (
     <div className="min-h-screen bg-[#EBEBEB]">
-      {/* Header */}
       <header className="bg-white border-b border-[#E2E2E2] px-6 py-4 flex items-center justify-between">
         <div>
           <h1 className="text-base font-semibold text-[#1A1A1A]">Admin Dashboard</h1>
@@ -286,42 +309,47 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-6 flex flex-col gap-6">
-        {/* Stat cards */}
+      <main className="max-w-6xl mx-auto px-4 md:px-6 py-6 flex flex-col gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard label="Questions today" value={stats?.questions_today ?? 0} icon={MessageSquare} color="#6B3AC6" />
+          <StatCard label="Answer rate" value={`${Math.round((stats?.answer_rate ?? 0) * 100)}%`} sub="of questions answered" icon={CheckCircle} color="#16A34A" />
+          <StatCard label="Avg confidence" value={`${Math.round((stats?.avg_confidence ?? 0) * 100)}%`} sub="on answered questions" icon={TrendingUp} color="#D97706" />
+          <StatCard label="Total questions" value={stats?.total_questions ?? 0} icon={Activity} color="#0EA5E9" />
+        </div>
+
+        {/* Cost / usage (Phase 7) */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard
-            label="Questions today"
-            value={stats?.questions_today ?? 0}
-            icon={MessageSquare}
+            label="Total cost"
+            value={`$${(usage?.cost_usd ?? 0).toFixed(4)}`}
+            sub="estimated LLM spend"
+            icon={Coins}
             color="#6B3AC6"
           />
           <StatCard
-            label="Answer rate"
-            value={`${Math.round((stats?.answer_rate ?? 0) * 100)}%`}
-            sub="of questions answered"
-            icon={CheckCircle}
+            label="Total tokens"
+            value={(usage?.total_tokens ?? 0).toLocaleString()}
+            sub="prompt + completion"
+            icon={Hash}
+            color="#0EA5E9"
+          />
+          <StatCard
+            label="Prompt tokens"
+            value={(usage?.prompt_tokens ?? 0).toLocaleString()}
+            icon={Hash}
             color="#16A34A"
           />
           <StatCard
-            label="Avg confidence"
-            value={`${Math.round((stats?.avg_confidence ?? 0) * 100)}%`}
-            sub="on answered questions"
-            icon={TrendingUp}
+            label="Completion tokens"
+            value={(usage?.completion_tokens ?? 0).toLocaleString()}
+            icon={Hash}
             color="#D97706"
-          />
-          <StatCard
-            label="Total questions"
-            value={stats?.total_questions ?? 0}
-            icon={Activity}
-            color="#0EA5E9"
           />
         </div>
 
-        {/* Charts row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Daily questions — line chart */}
           <div className="md:col-span-2 bg-white rounded-2xl border border-[#E2E2E2] shadow-sm p-5">
-            <h2 className="text-sm font-semibold text-[#1A1A1A] mb-4">Questions per day (last 7 days)</h2>
+            <h2 className="text-sm font-semibold text-[#1A1A1A] mb-4">Questions per day</h2>
             {(stats?.daily_counts.length ?? 0) > 0 ? (
               <ResponsiveContainer width="100%" height={180}>
                 <LineChart data={stats!.daily_counts} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
@@ -335,13 +363,10 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-[180px] text-xs text-[#AAAAAA]">
-                No data yet
-              </div>
+              <div className="flex items-center justify-center h-[180px] text-xs text-[#AAAAAA]">No data yet</div>
             )}
           </div>
 
-          {/* Confidence distribution — bar chart */}
           <div className="bg-white rounded-2xl border border-[#E2E2E2] shadow-sm p-5">
             <h2 className="text-sm font-semibold text-[#1A1A1A] mb-4">Confidence breakdown</h2>
             {confDistData.some((d) => d.value > 0) ? (
@@ -353,35 +378,31 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                   <RechartTooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #E2E2E2" }} />
                   <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                     {confDistData.map((entry) => (
-                      <Cell
-                        key={entry.name}
-                        fill={CONFIDENCE_COLORS[entry.name as keyof typeof CONFIDENCE_COLORS]}
-                      />
+                      <Cell key={entry.name} fill={CONFIDENCE_COLORS[entry.name as keyof typeof CONFIDENCE_COLORS]} />
                     ))}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-[180px] text-xs text-[#AAAAAA]">
-                No data yet
-              </div>
+              <div className="flex items-center justify-center h-[180px] text-xs text-[#AAAAAA]">No data yet</div>
             )}
           </div>
         </div>
 
-        {/* Feedback row */}
         {(stats?.feedback.total ?? 0) > 0 && (
-          <div className="bg-white rounded-2xl border border-[#E2E2E2] shadow-sm p-5">
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl border border-[#E2E2E2] shadow-sm p-5"
+          >
             <h2 className="text-sm font-semibold text-[#1A1A1A] mb-4">User feedback</h2>
-            <div className="flex items-center gap-8">
-              <ResponsiveContainer width={160} height={160}>
+            <div className="flex flex-col sm:flex-row items-center gap-6">
+              <ResponsiveContainer width={140} height={140}>
                 <PieChart>
                   <Pie
                     data={feedbackData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={45}
-                    outerRadius={70}
+                    cx="50%" cy="50%"
+                    innerRadius={38} outerRadius={60}
                     paddingAngle={3}
                     dataKey="value"
                   >
@@ -408,17 +429,14 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                 </p>
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
 
-        {/* Gap table */}
         <GapTable gaps={gaps} token={token} />
       </main>
     </div>
   );
 }
-
-// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
   const [token, setToken] = useState<string | null>(null);

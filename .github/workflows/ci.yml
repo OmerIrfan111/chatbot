@@ -8,11 +8,15 @@ on:
 
 jobs:
   backend:
-    name: Backend — lint & test
+    name: Backend — lint, test & eval
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
+    env:
+      # Eval steps run only when this secret is configured (they hit real OpenAI).
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      JWT_SECRET: ci-test-secret
 
     steps:
       - uses: actions/checkout@v4
@@ -22,16 +26,44 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          # Install ruff and mypy for lint/type-check
+          pip install ruff mypy
 
       - name: Lint (ruff)
-        run: pip install ruff && ruff check app/
+        run: ruff check app/
 
       - name: Type check (mypy)
-        run: pip install mypy && mypy app/ --ignore-missing-imports
+        run: mypy app/ --ignore-missing-imports
 
       - name: Tests
         run: pytest
+
+      # ── Eval harness (only when an OpenAI key is configured) ──────────
+      - name: Start server for eval
+        if: ${{ env.OPENAI_API_KEY != '' }}
+        run: |
+          mkdir -p data
+          uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
+              echo "Server ready"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Seed sample documents
+        if: ${{ env.OPENAI_API_KEY != '' }}
+        run: python ../evals/seed_demo.py --url http://localhost:8000
+
+      - name: Run eval harness
+        if: ${{ env.OPENAI_API_KEY != '' }}
+        env:
+          EVAL_API_URL: http://localhost:8000
+          EVAL_THRESHOLD: 0.8
+        run: python ../evals/evaluate.py
 
   frontend:
     name: Frontend — lint & type-check
@@ -57,3 +89,10 @@ jobs:
 
       - name: Type check
         run: npx tsc --noEmit
+
+      - name: Build (production)
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_TENANT_ID: default
+          NEXT_PUBLIC_TENANT_API_KEY: demo-key

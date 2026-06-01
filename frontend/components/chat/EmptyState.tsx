@@ -99,31 +99,31 @@ export function EmptyState({ onSuggestion, hasDocuments }: EmptyStateProps) {
           : "Upload a document using the folder icon, then ask questions about it"}
       </motion.p>
 
-      {/* Prompt cards */}
-      {hasDocuments && (
-        <>
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.12, duration: 0.3 }}
-            className="grid grid-cols-4 gap-3 mb-4"
-          >
-            {prompts.map((text, i) => (
-              <motion.button
-                key={text}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15 + i * 0.05, duration: 0.25 }}
-                whileHover={{ y: -2 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => onSuggestion(text)}
-                className="flex flex-col justify-between text-left p-4 rounded-2xl bg-white border border-[#E8E8E8] hover:border-[#CCCCCC] hover:shadow-sm transition-all min-h-[110px]"
-              >
-                <p className="text-xs font-medium text-[#1A1A1A] leading-relaxed">{text}</p>
-                <span className="text-[#CCCCCC] mt-3">{CARD_ICONS[i % CARD_ICONS.length]}</span>
-              </motion.button>
-            ))}
-          </motion.div>
+        {/* Prompt cards */}
+        {hasDocuments && (
+          <>
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.12, duration: 0.3 }}
+              className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4"
+            >
+              {prompts.map((text, i) => (
+                <motion.button
+                  key={text}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.15 + i * 0.05, duration: 0.25 }}
+                  whileHover={{ y: -2, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => onSuggestion(text)}
+                  className="flex flex-col justify-between text-left p-4 rounded-2xl bg-white border border-[#E8E8E8] hover:border-[#BBBBBB] transition-all min-h-[110px] group"
+                >
+                  <p className="text-xs font-medium text-[#1A1A1A] leading-relaxed group-hover:text-[#6B3AC6] transition-colors">{text}</p>
+                  <span className="text-[#CCCCCC] mt-3 group-hover:text-[#6B3AC6] transition-colors">{CARD_ICONS[i % CARD_ICONS.length]}</span>
+                </motion.button>
+              ))}
+            </motion.div>
 
           {/* Refresh / source hint */}
           <motion.div

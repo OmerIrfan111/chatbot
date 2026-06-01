@@ -1,7 +1,11 @@
 "use client";
 
-import { useRef, useState, useCallback, KeyboardEvent } from "react";
-import { Paperclip, ImageIcon, ArrowRight, Globe, ChevronDown, Square } from "lucide-react";
+import { useRef, useState, useCallback, KeyboardEvent, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowRight, Square, Paperclip, Loader2 } from "lucide-react";
+import { useUpload } from "@/lib/hooks/useDocuments";
+
+const MAX_CHARS = 1000;
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -12,6 +16,11 @@ interface ChatInputProps {
 export function ChatInput({ onSend, isStreaming, disabled }: ChatInputProps) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [focused, setFocused] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const { upload, pending } = useUpload();
+
+  const uploading = pending.some((p) => p.status === "uploading" || p.status === "processing");
 
   const adjustHeight = useCallback(() => {
     const el = textareaRef.current;
@@ -32,79 +41,107 @@ export function ChatInput({ onSend, isStreaming, disabled }: ChatInputProps) {
   }, [value, isStreaming, disabled, onSend]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
   };
 
-  const charCount = value.length;
   const canSend = value.trim().length > 0 && !isStreaming && !disabled;
 
-  return (
-    <div className="px-8 pb-6 max-w-3xl w-full mx-auto">
-      <div className="bg-white rounded-2xl border border-[#E2E2E2] shadow-sm overflow-hidden">
+  useEffect(() => {
+    if (!disabled && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [disabled]);
 
-        {/* Top row: textarea + All Web */}
+  return (
+    <div className="px-6 pb-5 max-w-3xl w-full mx-auto">
+      <motion.div
+        animate={{
+          boxShadow: focused
+            ? "0 0 0 2px #6B3AC640, 0 4px 16px rgba(0,0,0,0.08)"
+            : "0 1px 4px rgba(0,0,0,0.06)",
+        }}
+        transition={{ duration: 0.15 }}
+        className="bg-white rounded-2xl border border-[#E2E2E2] overflow-hidden"
+      >
         <div className="flex items-start gap-3 px-5 pt-4 pb-2">
           <textarea
             ref={textareaRef}
             value={value}
+            maxLength={MAX_CHARS}
             onChange={(e) => { setValue(e.target.value); adjustHeight(); }}
             onKeyDown={onKeyDown}
-            placeholder={disabled ? "Upload a document to begin…" : "Ask whatever you want...."}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            placeholder={disabled ? "Upload a document to begin" : "Ask whatever you want..."}
             rows={1}
-            disabled={disabled || isStreaming}
+            disabled={isStreaming}
             className="flex-1 resize-none bg-transparent text-sm text-[#1A1A1A] placeholder:text-[#AAAAAA] outline-none min-h-[24px] max-h-[180px] leading-6 py-0 disabled:cursor-not-allowed"
             aria-label="Chat input"
           />
-
-          {/* All Web dropdown */}
-          <button
-            className="flex items-center gap-1 shrink-0 text-xs text-[#555555] hover:text-[#1A1A1A] bg-[#F3F3F3] hover:bg-[#E8E8E8] rounded-lg px-2.5 py-1.5 transition-colors mt-0.5"
-            aria-label="Select search scope"
-          >
-            <Globe className="h-3.5 w-3.5" />
-            <span className="font-medium">All Web</span>
-            <ChevronDown className="h-3 w-3" />
-          </button>
         </div>
 
-        {/* Bottom row: actions + counter + send */}
-        <div className="flex items-center gap-3 px-4 pb-3">
-          {/* Attachment */}
-          <button className="flex items-center gap-1.5 text-xs text-[#888888] hover:text-[#1A1A1A] transition-colors">
-            <Paperclip className="h-3.5 w-3.5" />
-            <span>Add Attachment</span>
-          </button>
+        {/* Hidden file input — real document upload */}
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".pdf,.txt,.docx,.csv,.md,.html,.htm"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) upload([f]);
+            e.target.value = "";
+          }}
+        />
 
-          {/* Image */}
-          <button className="flex items-center gap-1.5 text-xs text-[#888888] hover:text-[#1A1A1A] transition-colors">
-            <ImageIcon className="h-3.5 w-3.5" />
-            <span>Use Image</span>
+        <div className="flex items-center gap-3 px-4 pb-3">
+          {/* Upload a document (wired to the real ingest endpoint) */}
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            className="flex items-center gap-1.5 text-xs text-[#888888] hover:text-[#1A1A1A] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {uploading
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              : <Paperclip className="h-3.5 w-3.5" />}
+            <span className="hidden sm:inline">{uploading ? "Uploading…" : "Upload document"}</span>
           </button>
 
           <div className="flex-1" />
 
-          {/* Character count */}
-          <span className="text-xs text-[#AAAAAA] tabular-nums">
-            {charCount}/1000
-          </span>
+          <AnimatePresence mode="wait">
+            {value.length > 0 && (
+              <motion.span
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: "auto" }}
+                exit={{ opacity: 0, width: 0 }}
+                className="text-xs text-[#AAAAAA] tabular-nums overflow-hidden"
+              >
+                {value.length}/{MAX_CHARS}
+              </motion.span>
+            )}
+          </AnimatePresence>
 
-          {/* Send button */}
-          <button
+          <motion.button
             onClick={handleSend}
             disabled={!canSend}
-            aria-label={isStreaming ? "Stop" : "Send"}
+            aria-label={isStreaming ? "Streaming" : "Send"}
             className="flex h-8 w-8 items-center justify-center rounded-full transition-all"
             style={{
               background: canSend ? "#6B3AC6" : "#E2E2E2",
               color: canSend ? "white" : "#AAAAAA",
             }}
+            whileHover={canSend ? { scale: 1.05 } : {}}
+            whileTap={canSend ? { scale: 0.92 } : {}}
           >
             {isStreaming
               ? <Square className="h-3 w-3 fill-current" />
               : <ArrowRight className="h-4 w-4" />}
-          </button>
+          </motion.button>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

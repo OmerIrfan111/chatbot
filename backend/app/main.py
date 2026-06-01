@@ -7,7 +7,8 @@ from typing import Optional
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app.analytics import (
@@ -123,7 +124,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="AI Support Agent API (mutex)", version="0.6.0", lifespan=lifespan)
+app = FastAPI(title="AI Support Agent API", version="0.7.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -132,6 +133,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── static files (widget bundle) ───────────────────────────────────────────────
+_widget_dir = Path(__file__).resolve().parent.parent.parent / "frontend" / "widget"
+if _widget_dir.exists():
+    app.mount("/widget", StaticFiles(directory=str(_widget_dir), html=True), name="widget")
 
 
 # ── health (public) ──────────────────────────────────────────────────────────────

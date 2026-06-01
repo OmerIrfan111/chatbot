@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning className={outfit.variable}>
-      <body className="font-sans bg-[#EBEBEB] text-[#1A1A1A]">
+      <body className="font-sans bg-[#EBEBEB] text-[#1A1A1A] relative">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
           <Providers>
             <TooltipProvider>

@@ -128,3 +128,11 @@ export interface GapItem {
   is_refusal: boolean;
   created_at: string;
 }
+
+export interface AdminUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  cost_usd: number;
+  interactions: number;
+}

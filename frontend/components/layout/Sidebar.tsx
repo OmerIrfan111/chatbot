@@ -19,7 +19,12 @@ export function Sidebar() {
       }}
     >
       {/* Sidebar pattern overlay */}
-      <div className="pointer-events-none absolute inset-0 pattern-dots-cy opacity-30" aria-hidden />
+      <div className="pointer-events-none absolute inset-0 opacity-[0.04]" aria-hidden
+        style={{
+          backgroundImage: "radial-gradient(circle, #FF3AF2 1px, transparent 1px)",
+          backgroundSize: "16px 16px",
+        }}
+      />
 
       {/* Header */}
       <div

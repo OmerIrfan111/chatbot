@@ -60,7 +60,7 @@ class Settings(BaseSettings):
 
     # App
     app_env: str = "development"
-    allowed_origins: list[str] = ["http://localhost:3000"]
+    allowed_origins: list[str] = ["http://localhost:3000", "*"]  # wildcard for widget embed
 
 
 @lru_cache

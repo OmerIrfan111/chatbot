@@ -1,110 +1,116 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
+import { RotateCcw, User, Mail, FileText, Sliders } from "lucide-react";
 
-const STARTERS = [
-  { q: "What is the return and refund policy?",  color: "#FF3AF2", shadow: "#7B2FFF" },
-  { q: "How do I get started with the product?", color: "#00F5D4", shadow: "#FF3AF2" },
-  { q: "What are the system requirements?",       color: "#FFE600", shadow: "#FF6B35" },
-  { q: "How can I contact support?",              color: "#FF6B35", shadow: "#FFE600" },
+const ALL_PROMPTS = [
+  { text: "Ask what a specific section of your document says", icon: <User className="h-5 w-5" /> },
+  { text: "Generate a summary of the uploaded document", icon: <Mail className="h-5 w-5" /> },
+  { text: "Find key information from your files in one paragraph", icon: <FileText className="h-5 w-5" /> },
+  { text: "How does this document answer a specific question?", icon: <Sliders className="h-5 w-5" /> },
 ];
 
-interface EmptyStateProps { onSuggestion: (q: string) => void; hasDocuments: boolean; }
+interface EmptyStateProps {
+  onSuggestion: (q: string) => void;
+  hasDocuments: boolean;
+}
 
 export function EmptyState({ onSuggestion, hasDocuments }: EmptyStateProps) {
+  const [prompts, setPrompts] = useState(ALL_PROMPTS);
+
+  const refresh = () => {
+    setPrompts((p) => [...p.slice(1), p[0]]);
+  };
+
   return (
-    <div className="relative flex flex-1 flex-col items-center justify-center px-8 py-12 overflow-hidden select-none">
+    <div className="flex flex-1 flex-col justify-center px-8 py-10 max-w-3xl w-full mx-auto">
 
-      {/* Ghost background word */}
-      <div
-        className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 flex items-center justify-center overflow-hidden"
-        aria-hidden
-      >
-        <span
-          className="text-[11rem] font-black uppercase tracking-tighter leading-none opacity-[0.04] whitespace-nowrap"
-          style={{ color: "#FF3AF2", fontFamily: "var(--font-outfit)" }}
-        >
-          {hasDocuments ? "ASK" : "UPLOAD"}
-        </span>
-      </div>
-
-      {/* Heading */}
+      {/* Greeting */}
       <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: "easeOut" }}
-        className="relative text-center mb-4"
-      >
-        <h2
-          className="text-5xl font-black uppercase leading-none tracking-tighter"
-          style={{
-            fontFamily: "var(--font-outfit)",
-            color: "#FF3AF2",
-            textShadow: "3px 3px 0 #7B2FFF, 6px 6px 0 #00F5D4",
-          }}
-        >
-          AI Support
-        </h2>
-        <h2
-          className="text-5xl font-black uppercase leading-none tracking-tighter"
-          style={{
-            fontFamily: "var(--font-outfit)",
-            color: "#00F5D4",
-            textShadow: "3px 3px 0 #FF3AF2, 6px 6px 0 #FFE600",
-          }}
-        >
-          Agent
-        </h2>
-      </motion.div>
-
-      {/* Subtext */}
-      <motion.p
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1, duration: 0.4, ease: "easeOut" }}
-        className="text-sm font-medium text-center max-w-xs mb-8 leading-relaxed"
-        style={{ color: "rgba(250,250,255,0.6)" }}
+        transition={{ duration: 0.35, ease: "easeOut" }}
+        className="mb-2"
+      >
+        <h1 className="text-[2.6rem] font-bold leading-tight tracking-tight text-[#1A1A1A]">
+          Hi there,{" "}
+          <span
+            style={{
+              background: "linear-gradient(90deg, #7134C9 0%, #C960D4 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}
+          >
+            {hasDocuments ? "User" : "there"}
+          </span>
+        </h1>
+        <h1 className="text-[2.6rem] font-bold leading-tight tracking-tight">
+          <span className="text-[#1A1A1A]">What would </span>
+          <span
+            style={{
+              background: "linear-gradient(90deg, #7134C9 0%, #C960D4 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}
+          >
+            like to know?
+          </span>
+        </h1>
+      </motion.div>
+
+      {/* Subtitle */}
+      <motion.p
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.07, duration: 0.3 }}
+        className="text-sm text-[#888888] mb-8 leading-snug"
       >
         {hasDocuments
-          ? "Ask anything about your uploaded documents. Answers grounded strictly in your content."
-          : "Upload a document in the sidebar, then ask questions about its content."}
+          ? "Use one of the most common prompts below or use your own to begin"
+          : "Upload a document using the folder icon, then ask questions about it"}
       </motion.p>
 
-      {/* Suggestion chips */}
+      {/* Prompt cards */}
       {hasDocuments && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.18, duration: 0.4 }}
-          className="flex flex-col gap-3 w-full max-w-sm"
-        >
-          <p
-            className="text-[10px] font-black uppercase tracking-[0.25em] text-center mb-1"
-            style={{ color: "#FFE600" }}
+        <>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.12, duration: 0.3 }}
+            className="grid grid-cols-4 gap-3 mb-4"
           >
-            Try asking
-          </p>
-          {STARTERS.map(({ q, color, shadow }, i) => (
-            <motion.button
-              key={q}
-              initial={{ opacity: 0, x: -12 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.22 + i * 0.06, duration: 0.3, ease: "easeOut" }}
-              whileHover={{ scale: 1.025, x: 4 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => onSuggestion(q)}
-              className="w-full text-left text-sm font-bold px-4 py-3 rounded-2xl border-2 transition-all"
-              style={{
-                color: "#FAFAFF",
-                background: `${color}10`,
-                borderColor: `${color}55`,
-                boxShadow: `4px 4px 0 ${shadow}44`,
-              }}
-            >
-              {q}
-            </motion.button>
-          ))}
-        </motion.div>
+            {prompts.map(({ text, icon }, i) => (
+              <motion.button
+                key={text}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 + i * 0.05, duration: 0.25 }}
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => onSuggestion(text)}
+                className="flex flex-col justify-between text-left p-4 rounded-2xl bg-white border border-[#E8E8E8] hover:border-[#CCCCCC] hover:shadow-sm transition-all min-h-[110px]"
+              >
+                <p className="text-xs font-medium text-[#1A1A1A] leading-relaxed">{text}</p>
+                <span className="text-[#CCCCCC] mt-3">{icon}</span>
+              </motion.button>
+            ))}
+          </motion.div>
+
+          {/* Refresh */}
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.35 }}
+            onClick={refresh}
+            className="flex items-center gap-1.5 text-xs text-[#888888] hover:text-[#1A1A1A] transition-colors w-fit"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Refresh Prompts
+          </motion.button>
+        </>
       )}
     </div>
   );

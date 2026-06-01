@@ -22,20 +22,22 @@ function SidebarIcon({
 }) {
   return (
     <Tooltip>
-      <TooltipTrigger>
-        <button
-          onClick={onClick}
-          className={cn(
-            "flex h-9 w-9 items-center justify-center rounded-xl transition-colors",
-            active
-              ? "bg-[#1A1A1A] text-white"
-              : "text-[#888888] hover:bg-[#E2E2E2] hover:text-[#1A1A1A]"
-          )}
-          aria-label={label}
-        >
-          {icon}
-        </button>
-      </TooltipTrigger>
+      <TooltipTrigger
+        render={
+          <button
+            onClick={onClick}
+            className={cn(
+              "flex h-9 w-9 items-center justify-center rounded-xl transition-colors",
+              active
+                ? "bg-[#1A1A1A] text-white"
+                : "text-[#888888] hover:bg-[#E2E2E2] hover:text-[#1A1A1A]"
+            )}
+            aria-label={label}
+          >
+            {icon}
+          </button>
+        }
+      />
       <TooltipContent side="right" className="text-xs">
         {label}
       </TooltipContent>

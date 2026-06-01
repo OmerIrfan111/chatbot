@@ -82,25 +82,6 @@ docker-compose up
 ├── docker-compose.yml
 └── CLAUDE.md         # Build plan & phase tracking
 ```
-
----
-
-## Build Phases
-
-| Phase | Description | Status |
-|-------|-------------|--------|
-| 0 | Foundations & Scaffolding | ✅ Complete |
-| 1 | Core RAG Loop (Backend) | ⏳ Pending |
-| 2 | Frontend Chat Experience | ⏳ Pending |
-| 3 | Memory & Multi-Format Ingestion | ⏳ Pending |
-| 4 | Citations & Confidence | ⏳ Pending |
-| 5 | Admin Dashboard & Analytics | ⏳ Pending |
-| 6 | Advanced Retrieval & AI Features | ⏳ Pending |
-| 7 | Security, Multi-Tenancy & Scale | ⏳ Pending |
-| 8 | Polish, Evaluation & Release | ⏳ Pending |
-
----
-
 ## Development
 
 ### Backend
@@ -128,19 +109,6 @@ cd backend && pytest
 # Frontend
 cd frontend && npm run lint && npx tsc --noEmit
 ```
-
----
-
-## Environment Variables
-
-See [`.env.example`](.env.example) for all required variables. Key ones:
-
-| Variable | Description |
-|----------|-------------|
-| `OPENAI_API_KEY` | Your OpenAI API key |
-| `DATABASE_URL` | SQLite (dev) or Postgres (prod) connection string |
-| `JWT_SECRET` | Secret for signing JWT tokens |
-| `NEXT_PUBLIC_API_URL` | Backend URL visible to the browser |
 
 ---
 

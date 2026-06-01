@@ -2,7 +2,14 @@
 
 import { create } from "zustand";
 import { nanoid } from "nanoid";
-import type { ChatMessage, Source } from "@/lib/types";
+import type { ChatMessage, ConflictWarning, Source } from "@/lib/types";
+
+interface FinalizePayload {
+  sources: Source[];
+  confidence: number;
+  low_confidence_warning: boolean;
+  conflict_warning: ConflictWarning | null;
+}
 
 interface ChatStore {
   messages: ChatMessage[];
@@ -12,7 +19,7 @@ interface ChatStore {
   addUserMessage: (content: string) => string;
   addAssistantPlaceholder: () => string;
   appendToken: (id: string, token: string) => void;
-  finalizeAssistant: (id: string, sources: Source[], confidence: number) => void;
+  finalizeAssistant: (id: string, payload: FinalizePayload) => void;
   setStreaming: (v: boolean) => void;
   clearMessages: () => void;
 }
@@ -25,10 +32,7 @@ export const useChatStore = create<ChatStore>((set) => ({
   addUserMessage: (content) => {
     const id = nanoid();
     set((s) => ({
-      messages: [
-        ...s.messages,
-        { id, role: "user", content, timestamp: new Date() },
-      ],
+      messages: [...s.messages, { id, role: "user", content, timestamp: new Date() }],
     }));
     return id;
   },
@@ -38,13 +42,7 @@ export const useChatStore = create<ChatStore>((set) => ({
     set((s) => ({
       messages: [
         ...s.messages,
-        {
-          id,
-          role: "assistant",
-          content: "",
-          streaming: true,
-          timestamp: new Date(),
-        },
+        { id, role: "assistant", content: "", streaming: true, timestamp: new Date() },
       ],
     }));
     return id;
@@ -58,15 +56,23 @@ export const useChatStore = create<ChatStore>((set) => ({
     }));
   },
 
-  finalizeAssistant: (id, sources, confidence) => {
+  finalizeAssistant: (id, payload) => {
     set((s) => ({
       messages: s.messages.map((m) =>
-        m.id === id ? { ...m, streaming: false, sources, confidence } : m
+        m.id === id
+          ? {
+              ...m,
+              streaming: false,
+              sources: payload.sources,
+              confidence: payload.confidence,
+              low_confidence_warning: payload.low_confidence_warning,
+              conflict_warning: payload.conflict_warning,
+            }
+          : m
       ),
     }));
   },
 
   setStreaming: (v) => set({ isStreaming: v }),
-
   clearMessages: () => set({ messages: [] }),
 }));

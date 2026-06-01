@@ -11,7 +11,7 @@ from app.config import get_settings
 from app.database import SessionLocal, init_db
 from app.ingest import ingest_file
 from app.memory import memory_store
-from app.models import Document
+from app.models import ChunkMetadata, Document
 from app.retriever import retrieve
 from app.vectorstore import FAISSVectorStore
 
@@ -98,6 +98,7 @@ async def delete_document(document_id: int):
     store = get_store()
     store.delete_by_document(document_id)
     with SessionLocal() as db:
+        # ChunkMetadata rows are CASCADE-deleted with the document
         doc = db.get(Document, document_id)
         if doc:
             db.delete(doc)

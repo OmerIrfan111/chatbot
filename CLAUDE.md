@@ -255,7 +255,7 @@ User question: {question}
 ---
 
 ### Phase 4 — Citations & Confidence
-**Status:** `[ ] NOT STARTED`
+**Status:** `[x] COMPLETE`
 
 **Scope:**
 - Persist rich chunk metadata in DB
@@ -267,11 +267,23 @@ User question: {question}
 - Multi-document conflict detection (surface both sources + flag)
 
 **QA Gate:**
-- [ ] Every grounded answer shows at least one correct citation
-- [ ] Expanding citation chip shows real snippet and page
-- [ ] Low-similarity answers trigger warning badge
-- [ ] Contradictory sources surface both with a conflict note
-- [ ] Badge is understandable to non-technical users
+- [x] Every grounded answer shows at least one correct citation  (test_chat_response_has_all_citation_fields, test_source_snippet_is_non_empty)
+- [x] Expanding citation chip shows real snippet and page  (CitationChip with AnimatePresence expansion)
+- [x] Low-similarity answers trigger warning badge  (test_low_confidence_warning_is_bool, ConfidenceBadge)
+- [x] Contradictory sources surface both with a conflict note  (test_conflict_warning_structure_when_present, _detect_conflict)
+- [x] Badge is understandable to non-technical users  (Tooltip with plain-English label in ConfidenceBadge)
+
+**Files added/changed (2026-06-01):**
+- `backend/app/chain.py` — `_compute_confidence`, `_detect_conflict`, `_build_sources` (with snippet), confidence + conflict in `/chat` and `/chat/stream`
+- `backend/app/models.py` — `ChunkMetadata` table for persistent snippet/page storage
+- `backend/app/ingest.py` — persists `ChunkMetadata` rows per chunk; CASCADE-deleted with document
+- `backend/tests/test_citations.py` — 10 Phase 4 tests, all passing
+- `backend/tests/constants.py` — shared `FAKE_EMBEDDING` constant importable by test modules
+- `backend/tests/conftest.py` — FK pragma on test engine; patches `SessionLocal` in `app.ingest` + `app.main`
+- `frontend/lib/types.ts` — `Source`, `ConflictWarning`, `SSEEvent` with full Phase 4 fields
+- `frontend/store/chat.ts` — `finalizeAssistant` stores `confidence`, `low_confidence_warning`, `conflict_warning`
+- `frontend/components/chat/CitationChip.tsx` — expandable chip (AnimatePresence, score-colored icon)
+- `frontend/components/chat/Message.tsx` — `ConfidenceBadge` (green/amber/red + Tooltip), warning banners, citations section
 
 ---
 
@@ -412,14 +424,17 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 | Phase 1 | faiss-cpu==1.14.2 | 1.9.0 not available on Windows pip; 1.14.2 is latest working |
 | Phase 1 | Test isolation via direct injection | Module-level `settings` vars bypass env monkeypatching; inject FAISSVectorStore and SQLAlchemy engine directly in conftest |
 | Phase 0 start | Next.js App Router (not Pages) | App Router is the current Next.js standard; RSC + layouts |
+| Phase 4 | FAKE_EMBEDDING extracted to tests/constants.py | `from conftest import X` fails at runtime — conftest isn't a standard importable module; shared constants must live in a plain .py file |
+| Phase 4 | Patch SessionLocal in app.ingest + app.main in _isolated_store | Modules that do `from app.database import SessionLocal` bind the name at import time; patching db_module.SessionLocal alone doesn't propagate to those references |
+| Phase 4 | FK pragma added to test engine | SQLite CASCADE deletes require `PRAGMA foreign_keys=ON` per connection; test engine must register this listener explicitly |
 
 ---
 
 ## Current Status
 
-**Active Phase:** Phase 4 — Citations & Confidence  
-**Last Completed Phase:** Phase 3 — Memory & Multi-Format Ingestion (2026-06-01)  
-**Next Action:** Persist rich chunk metadata in DB, return citations as expandable chips with snippet+page, compute confidence from similarity, green/amber/red badge, multi-document conflict detection.
+**Active Phase:** Phase 5 — Admin Dashboard & Analytics  
+**Last Completed Phase:** Phase 4 — Citations & Confidence (2026-06-01)  
+**Next Action:** Log every question/answer/confidence/citations to DB, add thumbs up/down feedback, build admin route (JWT admin role), stat cards, Recharts charts, gap table with CSV export.
 
 ---
 

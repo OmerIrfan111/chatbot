@@ -17,7 +17,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.database import SessionLocal
 from app.llm import get_embeddings
-from app.models import Document
+from app.models import ChunkMetadata, Document
 from app.vectorstore import Chunk, FAISSVectorStore
 
 logger = logging.getLogger(__name__)
@@ -239,12 +239,24 @@ async def ingest_file(file: UploadFile, store: FAISSVectorStore) -> int:
 
     store.add(chunks)
 
-    # Update chunk count
+    # Persist chunks to SQLite + update chunk count (atomic)
     with SessionLocal() as db:
+        # Remove any stale chunks for this document (idempotent re-index)
+        db.query(ChunkMetadata).filter(ChunkMetadata.document_id == document_id).delete()
+
+        for chunk in chunks:
+            m = chunk.metadata
+            db.add(ChunkMetadata(
+                document_id=m["document_id"],
+                chunk_index=m["chunk_index"],
+                page=m["page"],
+                text=chunk.text,
+            ))
+
         doc = db.get(Document, document_id)
         if doc:
             doc.chunk_count = len(chunks)
-            db.commit()
+        db.commit()
 
     logger.info("Ingested '%s': %d pages, %d chunks", filename, len(pages), len(chunks))
     return document_id

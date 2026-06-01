@@ -139,13 +139,36 @@ export function Message({ message }: { message: ChatMessage }) {
           </div>
         )}
 
-        {/* Footer */}
+        {/* Footer: confidence badge + copy + timestamp */}
         {!isUser && !message.streaming && message.content && (
           <div className="flex items-center gap-2 px-1">
             {message.confidence !== undefined && <ConfidenceBadge score={message.confidence} />}
             <CopyButton text={message.content} />
             <span className="text-[10px] text-[#CCCCCC] ml-auto">
               {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          </div>
+        )}
+
+        {/* Low-confidence warning */}
+        {!isUser && !message.streaming && message.low_confidence_warning && (
+          <div className="flex items-start gap-2 px-3 py-2 rounded-xl border text-xs"
+            style={{ background: "#FFFBEB", borderColor: "#FDE68A", color: "#92400E" }}>
+            <span className="shrink-0 mt-0.5">⚠️</span>
+            <span>
+              <strong>Low confidence.</strong> The retrieved context may not fully answer this question.
+              Consider rephrasing or uploading more relevant documents.
+            </span>
+          </div>
+        )}
+
+        {/* Conflict warning */}
+        {!isUser && !message.streaming && message.conflict_warning?.detected && (
+          <div className="flex items-start gap-2 px-3 py-2 rounded-xl border text-xs"
+            style={{ background: "#FFF7ED", borderColor: "#FED7AA", color: "#9A3412" }}>
+            <span className="shrink-0 mt-0.5">🔀</span>
+            <span>
+              <strong>Multiple sources detected.</strong> {message.conflict_warning.message}
             </span>
           </div>
         )}

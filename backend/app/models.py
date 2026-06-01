@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text
+from sqlalchemy import Column, ForeignKey, Integer, String, Float, DateTime, Text
 from sqlalchemy.orm import declarative_base
 from datetime import datetime, timezone
 
@@ -12,6 +12,18 @@ class Document(Base):
     filename = Column(String, nullable=False)
     content_type = Column(String, nullable=False, default="")
     chunk_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class ChunkMetadata(Base):
+    """Persists chunk text + metadata so citations survive FAISS rebuilds."""
+    __tablename__ = "chunk_metadata"
+
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(Integer, ForeignKey("documents.id", ondelete="CASCADE"), index=True, nullable=False)
+    chunk_index = Column(Integer, nullable=False)
+    page = Column(Integer, nullable=False, default=1)
+    text = Column(Text, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 

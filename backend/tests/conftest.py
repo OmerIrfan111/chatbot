@@ -9,9 +9,7 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
-# Fake 1536-dim embedding (text-embedding-3-small dimension)
-FAKE_DIM = 1536
-FAKE_EMBEDDING = (np.random.default_rng(42).random(FAKE_DIM)).tolist()
+from tests.constants import FAKE_EMBEDDING, FAKE_DIM  # noqa: F401  (re-exported for legacy imports)
 
 
 @pytest.fixture(autouse=True)
@@ -29,16 +27,31 @@ def _isolated_store(tmp_path):
     from sqlalchemy.orm import sessionmaker
     from app.models import Base
 
+    from sqlalchemy import event as sa_event
+
     new_engine = create_engine(db_url, connect_args={"check_same_thread": False})
+
+    @sa_event.listens_for(new_engine, "connect")
+    def _fk_pragma(dbapi_conn, _rec):
+        dbapi_conn.execute("PRAGMA foreign_keys=ON")
+
     Base.metadata.create_all(bind=new_engine)
+    new_session = sessionmaker(autocommit=False, autoflush=False, bind=new_engine)
     old_engine = db_module.engine
     old_session = db_module.SessionLocal
     db_module.engine = new_engine
-    db_module.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=new_engine)
+    db_module.SessionLocal = new_session
+
+    # Also patch SessionLocal in modules that imported it at load time
+    import app.ingest as ingest_module
+    import app.main as main_module
+    old_ingest_session = ingest_module.SessionLocal
+    old_main_session = main_module.SessionLocal
+    ingest_module.SessionLocal = new_session
+    main_module.SessionLocal = new_session
 
     # ── Fresh FAISS store — injected before TestClient starts ─────────────
     from app.vectorstore import FAISSVectorStore
-    import app.main as main_module
 
     fresh_store = FAISSVectorStore(path=str(tmp_path / "faiss"))
     main_module._store = fresh_store  # get_store() returns this; no OldPath loading
@@ -49,6 +62,8 @@ def _isolated_store(tmp_path):
     main_module._store = None
     db_module.engine = old_engine
     db_module.SessionLocal = old_session
+    ingest_module.SessionLocal = old_ingest_session
+    main_module.SessionLocal = old_main_session
 
 
 @pytest.fixture()

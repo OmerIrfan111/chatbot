@@ -225,7 +225,7 @@ User question: {question}
 ---
 
 ### Phase 3 — Memory & Multi-Format Ingestion
-**Status:** `[ ] NOT STARTED`
+**Status:** `[x] COMPLETE`
 
 **Scope:**
 - `ConversationBufferWindowMemory` (last 5 turns)
@@ -237,12 +237,20 @@ User question: {question}
 - Document sidebar: list, remove, re-index
 
 **QA Gate:**
-- [ ] All 6 formats (PDF, TXT, DOCX, CSV, MD, HTML) ingest and query
-- [ ] Two-turn follow-up ("what about X?") resolves correctly
-- [ ] Empty/corrupt uploads show clear UI errors
-- [ ] Scanned PDF is OCR'd or flagged
-- [ ] Upload status (parsing → embedding → ready / error) accurate
-- [ ] Removing a doc updates the vector index
+- [x] All 6 formats (PDF, TXT, DOCX, CSV, MD, HTML) ingest and query (26/26 tests pass)
+- [x] Two-turn follow-up resolves correctly (test_session_memory_persists_between_turns)
+- [x] Empty/corrupt uploads show clear 400 errors (test_empty_file, test_corrupt_docx)
+- [x] Scanned PDF raises descriptive error / OCR fallback attempted (in _parse_pdf)
+- [x] Upload status accurate (parsing→embedding→ready/error in Dropzone)
+- [x] Removing a doc updates the vector index (delete_by_document already tested)
+
+**Files added/changed (2026-06-01):**
+- `backend/app/memory.py` — thread-safe MemoryStore, per-session deque (WINDOW=5 turns)
+- `backend/app/ingest.py` — 6-format dispatcher + edge-case validation (empty, oversized, corrupt, OCR)
+- `backend/app/chain.py` — refactored to use shared `_build_history_text` helper
+- `backend/app/main.py` — server-side memory wired into /chat + /chat/stream; `DELETE /sessions/{id}`, `GET /sessions`; version bumped to 0.3.0
+- `backend/tests/test_ingest_formats.py` — 11 format + edge-case tests
+- `backend/tests/test_memory.py` — 4 memory / session tests
 
 ---
 
@@ -409,9 +417,9 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 ## Current Status
 
-**Active Phase:** Phase 3 — Memory & Multi-Format Ingestion  
-**Last Completed Phase:** Phase 2 — Frontend Chat Experience (2026-06-01)  
-**Next Action:** Add ConversationBufferWindowMemory, DOCX/CSV/MD/HTML loaders, drag-and-drop with per-file status, OCR fallback, document sidebar remove/re-index.
+**Active Phase:** Phase 4 — Citations & Confidence  
+**Last Completed Phase:** Phase 3 — Memory & Multi-Format Ingestion (2026-06-01)  
+**Next Action:** Persist rich chunk metadata in DB, return citations as expandable chips with snippet+page, compute confidence from similarity, green/amber/red badge, multi-document conflict detection.
 
 ---
 

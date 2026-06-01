@@ -18,6 +18,16 @@ SYSTEM_PROMPT = (
 CONFIDENCE_THRESHOLD = 0.70  # below this → low-confidence warning
 
 
+def _build_history_text(chat_history: list[dict] | None) -> str:
+    if not chat_history:
+        return ""
+    lines = [
+        f"{m['role'].capitalize()}: {m['content']}"
+        for m in chat_history[-10:]
+    ]
+    return "\nConversation history:\n" + "\n".join(lines)
+
+
 def _build_context(chunks: list[tuple[Chunk, float]]) -> str:
     parts = []
     for chunk, _ in chunks:
@@ -59,23 +69,10 @@ def answer(
     chunks: list[tuple[Chunk, float]],
     chat_history: list[dict] | None = None,
 ) -> dict:
-    """
-    Run the grounding chain and return:
-      {"answer": str, "sources": list[dict], "confidence": float}
-    """
-    context = _build_context(chunks)
-
-    history_text = ""
-    if chat_history:
-        lines = [
-            f"{m['role'].capitalize()}: {m['content']}"
-            for m in (chat_history or [])[-10:]
-        ]
-        history_text = "\nConversation history:\n" + "\n".join(lines)
-
+    """Run the grounding chain and return {answer, sources, confidence}."""
     user_content = (
-        f"Context:\n{context}"
-        f"{history_text}"
+        f"Context:\n{_build_context(chunks)}"
+        f"{_build_history_text(chat_history)}"
         f"\n\nUser question: {question}"
     )
 
@@ -98,19 +95,9 @@ async def answer_stream(
     chat_history: list[dict] | None = None,
 ) -> AsyncGenerator[str, None]:
     """Yields SSE-formatted data strings for token-by-token streaming."""
-    context = _build_context(chunks)
-
-    history_text = ""
-    if chat_history:
-        lines = [
-            f"{m['role'].capitalize()}: {m['content']}"
-            for m in (chat_history or [])[-10:]
-        ]
-        history_text = "\nConversation history:\n" + "\n".join(lines)
-
     user_content = (
-        f"Context:\n{context}"
-        f"{history_text}"
+        f"Context:\n{_build_context(chunks)}"
+        f"{_build_history_text(chat_history)}"
         f"\n\nUser question: {question}"
     )
 

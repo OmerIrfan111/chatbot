@@ -10,13 +10,13 @@ from app.chain import answer, answer_stream
 from app.config import get_settings
 from app.database import SessionLocal, init_db
 from app.ingest import ingest_file
+from app.memory import memory_store
 from app.models import Document
 from app.retriever import retrieve
 from app.vectorstore import FAISSVectorStore
 
 settings = get_settings()
 
-# Singleton — loaded once at startup, shared across requests
 _store: Optional[FAISSVectorStore] = None
 
 
@@ -27,18 +27,22 @@ def get_store() -> FAISSVectorStore:
     return _store
 
 
+def _require_docs(store: FAISSVectorStore) -> None:
+    if store.index is None or store.index.ntotal == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="No documents ingested yet. Upload a document first.",
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    get_store()  # warm up FAISS index
+    get_store()
     yield
 
 
-app = FastAPI(
-    title="AI Support Agent API",
-    version="0.2.0",
-    lifespan=lifespan,
-)
+app = FastAPI(title="AI Support Agent API (mutex)", version="0.3.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -49,8 +53,7 @@ app.add_middleware(
 )
 
 
-# ── health ────────────────────────────────────────────────────────────────────
-
+# ── health ─────────────────────────────────────────────────────────────────────
 
 @app.get("/health")
 async def health() -> dict:
@@ -62,12 +65,11 @@ async def health() -> dict:
     }
 
 
-# ── documents ─────────────────────────────────────────────────────────────────
-
+# ── documents ──────────────────────────────────────────────────────────────────
 
 @app.post("/upload", status_code=201)
 async def upload(file: UploadFile = File(...)):
-    """Ingest a PDF or TXT file into the vector store."""
+    """Ingest a PDF, TXT, DOCX, CSV, MD, or HTML file."""
     store = get_store()
     try:
         document_id = await ingest_file(file, store)
@@ -102,40 +104,80 @@ async def delete_document(document_id: int):
             db.commit()
 
 
-# ── chat ──────────────────────────────────────────────────────────────────────
+# ── sessions / memory ──────────────────────────────────────────────────────────
 
+@app.delete("/sessions/{session_id}", status_code=204)
+async def clear_session(session_id: str):
+    """Clear the conversation memory for a session."""
+    memory_store.delete(session_id)
+
+
+@app.get("/sessions")
+async def list_sessions():
+    return {"sessions": memory_store.list_sessions()}
+
+
+# ── chat ───────────────────────────────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
     question: str
     session_id: str = "default"
+    # If provided, used directly; otherwise server-side memory is used
     chat_history: list[dict] = []
+
+
+def _get_history(req: ChatRequest) -> list[dict]:
+    """Return client-provided history or fall back to server-side memory."""
+    if req.chat_history:
+        return req.chat_history
+    return memory_store.get(req.session_id).get()
+
+
+def _record_turn(session_id: str, question: str, response_text: str) -> None:
+    mem = memory_store.get(session_id)
+    mem.add("user", question)
+    mem.add("assistant", response_text)
 
 
 @app.post("/chat")
 async def chat(req: ChatRequest):
-    """Answer a question grounded in the ingested documents."""
     store = get_store()
-    if store.index is None or store.index.ntotal == 0:
-        raise HTTPException(
-            status_code=400,
-            detail="No documents ingested yet. Upload a document first.",
-        )
+    _require_docs(store)
+    history = _get_history(req)
     chunks = retrieve(req.question, store, k=5)
-    return answer(req.question, chunks, req.chat_history)
+    result = answer(req.question, chunks, history)
+    _record_turn(req.session_id, req.question, result["answer"])
+    return result
 
 
 @app.post("/chat/stream")
 async def chat_stream(req: ChatRequest):
     """Stream a grounded answer token-by-token via Server-Sent Events."""
     store = get_store()
-    if store.index is None or store.index.ntotal == 0:
-        raise HTTPException(
-            status_code=400,
-            detail="No documents ingested yet. Upload a document first.",
-        )
+    _require_docs(store)
+    history = _get_history(req)
     chunks = retrieve(req.question, store, k=5)
+
+    # We need to capture the full answer to persist in memory after streaming.
+    # Wrap the generator to intercept the "done" event.
+    async def _stream_and_record():
+        full_answer = []
+        async for sse in answer_stream(req.question, chunks, history):
+            yield sse
+            # Parse token content to reconstruct the answer
+            if sse.startswith("data: "):
+                import json
+                try:
+                    evt = json.loads(sse[6:])
+                    if evt.get("type") == "token":
+                        full_answer.append(evt.get("content", ""))
+                    elif evt.get("type") == "done":
+                        _record_turn(req.session_id, req.question, "".join(full_answer))
+                except Exception:
+                    pass
+
     return StreamingResponse(
-        answer_stream(req.question, chunks, req.chat_history),
+        _stream_and_record(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

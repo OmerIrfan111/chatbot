@@ -1,0 +1,41 @@
+# Web framework
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+python-multipart==0.0.20
+
+# Config
+pydantic-settings==2.7.0
+
+# Auth
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# Database
+sqlalchemy==2.0.36
+aiosqlite==0.20.0
+
+# LangChain / RAG
+langchain==0.3.14
+langchain-openai==0.3.0
+langchain-community==0.3.14
+faiss-cpu==1.9.0
+chromadb==0.6.3
+
+# Document parsers
+pdfplumber==0.11.5
+python-docx==1.1.2
+pandas==2.2.3
+beautifulsoup4==4.12.3
+unstructured==0.16.12
+pytesseract==0.3.13
+Pillow==11.1.0
+
+# Utilities
+tiktoken==0.8.0
+httpx==0.28.1
+python-dotenv==1.0.1
+
+# Testing
+pytest==8.3.4
+pytest-asyncio==0.25.0
+httpx==0.28.1

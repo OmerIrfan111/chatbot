@@ -1,0 +1,41 @@
+# Environment / secrets — NEVER commit
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Data — NEVER commit
+backend/data/
+data/
+
+# Node
+node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Docker
+*.log

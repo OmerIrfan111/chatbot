@@ -42,6 +42,22 @@ class Settings(BaseSettings):
     admin_email: str = "admin@example.com"
     admin_password: str = "change-me"
 
+    # Multi-tenancy (Phase 7)
+    default_tenant: str = "default"
+    # tenant_id -> api_key; widgets exchange the key for a scoped user token.
+    tenant_api_keys: dict[str, str] = {"default": "demo-key", "acme": "acme-key"}
+
+    # Rate limiting (Phase 7)
+    rate_limit_enabled: bool = True
+    rate_limit_per_minute: int = 60   # per (tenant, ip) sliding window
+
+    # Cost tracking (Phase 7) — USD per 1M tokens
+    price_input_per_1m: float = 0.15   # gpt-4o-mini input
+    price_output_per_1m: float = 0.60  # gpt-4o-mini output
+
+    # Guardrails (Phase 7)
+    guardrails_enabled: bool = True
+
     # App
     app_env: str = "development"
     allowed_origins: list[str] = ["http://localhost:3000"]

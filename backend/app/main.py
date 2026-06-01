@@ -2,9 +2,10 @@ import csv
 import io
 import json
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Optional
 
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -15,30 +16,44 @@ from app.analytics import (
     get_feedback_stats,
     get_gaps,
     get_stats,
+    get_usage_stats,
 )
-from app.auth import create_access_token, get_current_admin
+from app.auth import (
+    Principal,
+    create_access_token,
+    get_principal,
+    issue_tenant_token,
+    require_admin,
+)
 from app.chain import REFUSAL, answer, answer_stream
 from app.config import get_settings
 from app.database import SessionLocal, init_db
+from app.guardrails import redact_pii
 from app.ingest import ingest_file
 from app.llm import get_embeddings
 from app.memory import memory_store
 from app.models import Document, Feedback, Interaction, Ticket
+from app.ratelimit import get_limiter
 from app.retriever import retrieve
 from app.semantic_cache import semantic_cache
 from app.suggestions import generate_suggestions
+from app.usage import measure
 from app.vectorstore import FAISSVectorStore
 
 settings = get_settings()
 
-_store: Optional[FAISSVectorStore] = None
+# ── per-tenant vector stores ─────────────────────────────────────────────────────
+_stores: dict[str, FAISSVectorStore] = {}
 
 
-def get_store() -> FAISSVectorStore:
-    global _store
-    if _store is None:
-        _store = FAISSVectorStore()
-    return _store
+def get_store(tenant_id: str) -> FAISSVectorStore:
+    """Return the tenant's isolated FAISS store (one index namespace per tenant)."""
+    store = _stores.get(tenant_id)
+    if store is None:
+        path = str(Path(settings.vector_store_path) / tenant_id)
+        store = FAISSVectorStore(path=path)
+        _stores[tenant_id] = store
+    return store
 
 
 def _require_docs(store: FAISSVectorStore) -> None:
@@ -49,23 +64,52 @@ def _require_docs(store: FAISSVectorStore) -> None:
         )
 
 
+def _skey(tenant_id: str, session_id: str) -> str:
+    """Namespace memory/cache keys by tenant so sessions never collide."""
+    return f"{tenant_id}:{session_id}"
+
+
+# ── rate limiting ────────────────────────────────────────────────────────────────
+
+def rate_limit(request: Request, principal: Principal = Depends(get_principal)) -> Principal:
+    if not settings.rate_limit_enabled:
+        return principal
+    ip = request.client.host if request.client else "unknown"
+    allowed, retry_after = get_limiter().check(f"{principal.tenant_id}:{ip}")
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded. Slow down and try again.",
+            headers={"Retry-After": str(retry_after)},
+        )
+    return principal
+
+
+# ── interaction logging (PII-redacted + cost-tracked) ────────────────────────────
+
 def _log_interaction(
+    tenant_id: str,
     session_id: str,
     question: str,
     answer_text: str,
     confidence: Optional[float],
     low_confidence_warning: bool,
+    prompt_text: Optional[str] = None,
 ) -> int:
-    """Persist an interaction and return its ID."""
     is_refusal = REFUSAL.lower() in answer_text.lower()
+    usage = measure(prompt_text or question, answer_text)
     with SessionLocal() as db:
         row = Interaction(
+            tenant_id=tenant_id,
             session_id=session_id,
-            question=question,
-            answer=answer_text,
+            question=redact_pii(question),       # never persist raw PII
+            answer=redact_pii(answer_text),
             confidence=confidence,
             low_confidence_warning=low_confidence_warning,
             is_refusal=is_refusal,
+            prompt_tokens=usage["prompt_tokens"],
+            completion_tokens=usage["completion_tokens"],
+            cost_usd=usage["cost_usd"],
         )
         db.add(row)
         db.commit()
@@ -76,11 +120,10 @@ def _log_interaction(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    get_store()
     yield
 
 
-app = FastAPI(title="AI Support Agent API (mutex)", version="0.5.0", lifespan=lifespan)
+app = FastAPI(title="AI Support Agent API (mutex)", version="0.6.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -91,70 +134,17 @@ app.add_middleware(
 )
 
 
-# ── health ─────────────────────────────────────────────────────────────────────
+# ── health (public) ──────────────────────────────────────────────────────────────
 
 @app.get("/health")
 async def health() -> dict:
-    store = get_store()
-    return {
-        "status": "ok",
-        "version": app.version,
-        "indexed_chunks": store.index.ntotal if store.index else 0,
-    }
+    indexed = sum(
+        s.index.ntotal for s in _stores.values() if s.index is not None
+    )
+    return {"status": "ok", "version": app.version, "indexed_chunks": indexed}
 
 
-# ── documents ──────────────────────────────────────────────────────────────────
-
-@app.post("/upload", status_code=201)
-async def upload(file: UploadFile = File(...)):
-    """Ingest a PDF, TXT, DOCX, CSV, MD, or HTML file."""
-    store = get_store()
-    try:
-        document_id = await ingest_file(file, store)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    return {"document_id": document_id, "filename": file.filename, "status": "ready"}
-
-
-@app.get("/documents")
-async def list_documents():
-    with SessionLocal() as db:
-        docs = db.query(Document).order_by(Document.created_at.desc()).all()
-        return [
-            {
-                "id": d.id,
-                "filename": d.filename,
-                "chunk_count": d.chunk_count,
-                "created_at": d.created_at.isoformat() if d.created_at else None,
-            }
-            for d in docs
-        ]
-
-
-@app.delete("/documents/{document_id}", status_code=204)
-async def delete_document(document_id: int):
-    store = get_store()
-    store.delete_by_document(document_id)
-    with SessionLocal() as db:
-        doc = db.get(Document, document_id)
-        if doc:
-            db.delete(doc)
-            db.commit()
-
-
-# ── sessions / memory ──────────────────────────────────────────────────────────
-
-@app.delete("/sessions/{session_id}", status_code=204)
-async def clear_session(session_id: str):
-    memory_store.delete(session_id)
-
-
-@app.get("/sessions")
-async def list_sessions():
-    return {"sessions": memory_store.list_sessions()}
-
-
-# ── auth ───────────────────────────────────────────────────────────────────────
+# ── auth (public) ────────────────────────────────────────────────────────────────
 
 class LoginRequest(BaseModel):
     email: str
@@ -165,25 +155,106 @@ class LoginRequest(BaseModel):
 async def login(req: LoginRequest):
     if req.email != settings.admin_email or req.password != settings.admin_password:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    token = create_access_token({"sub": req.email, "role": "admin"})
+    token = create_access_token(
+        {"sub": req.email, "role": "admin", "tenant_id": settings.default_tenant}
+    )
     return {"access_token": token, "token_type": "bearer"}
 
 
-# ── feedback ───────────────────────────────────────────────────────────────────
+class TokenRequest(BaseModel):
+    tenant_id: str
+    api_key: str
+
+
+@app.post("/auth/token")
+async def tenant_token(req: TokenRequest):
+    """Exchange a tenant API key for a scoped end-user (widget) token."""
+    token = issue_tenant_token(req.tenant_id, req.api_key)
+    return {"access_token": token, "token_type": "bearer", "tenant_id": req.tenant_id}
+
+
+# ── documents ────────────────────────────────────────────────────────────────────
+
+@app.post("/upload", status_code=201)
+async def upload(
+    file: UploadFile = File(...),
+    principal: Principal = Depends(rate_limit),
+):
+    """Ingest a PDF, TXT, DOCX, CSV, MD, or HTML file into the tenant's index."""
+    store = get_store(principal.tenant_id)
+    try:
+        document_id = await ingest_file(file, store, tenant_id=principal.tenant_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"document_id": document_id, "filename": file.filename, "status": "ready"}
+
+
+@app.get("/documents")
+async def list_documents(principal: Principal = Depends(get_principal)):
+    with SessionLocal() as db:
+        docs = (
+            db.query(Document)
+            .filter(Document.tenant_id == principal.tenant_id)
+            .order_by(Document.created_at.desc())
+            .all()
+        )
+        return [
+            {
+                "id": d.id,
+                "filename": d.filename,
+                "chunk_count": d.chunk_count,
+                "version": d.version,
+                "created_at": d.created_at.isoformat() if d.created_at else None,
+            }
+            for d in docs
+        ]
+
+
+@app.delete("/documents/{document_id}", status_code=204)
+async def delete_document(document_id: int, principal: Principal = Depends(get_principal)):
+    with SessionLocal() as db:
+        doc = db.get(Document, document_id)
+        if not doc or doc.tenant_id != principal.tenant_id:
+            raise HTTPException(status_code=404, detail="Document not found")
+        get_store(principal.tenant_id).delete_by_document(document_id)
+        db.delete(doc)
+        db.commit()
+
+
+# ── sessions / memory ────────────────────────────────────────────────────────────
+
+@app.delete("/sessions/{session_id}", status_code=204)
+async def clear_session(session_id: str, principal: Principal = Depends(get_principal)):
+    memory_store.delete(_skey(principal.tenant_id, session_id))
+
+
+@app.get("/sessions")
+async def list_sessions(principal: Principal = Depends(get_principal)):
+    prefix = f"{principal.tenant_id}:"
+    sessions = [
+        s[len(prefix):] for s in memory_store.list_sessions() if s.startswith(prefix)
+    ]
+    return {"sessions": sessions}
+
+
+# ── feedback ─────────────────────────────────────────────────────────────────────
 
 class FeedbackRequest(BaseModel):
     rating: int  # 1 = thumbs up, -1 = thumbs down
 
 
 @app.post("/feedback/{interaction_id}", status_code=201)
-async def submit_feedback(interaction_id: int, req: FeedbackRequest):
+async def submit_feedback(
+    interaction_id: int,
+    req: FeedbackRequest,
+    principal: Principal = Depends(get_principal),
+):
     if req.rating not in (1, -1):
         raise HTTPException(status_code=422, detail="Rating must be 1 or -1")
     with SessionLocal() as db:
         interaction = db.get(Interaction, interaction_id)
-        if not interaction:
+        if not interaction or interaction.tenant_id != principal.tenant_id:
             raise HTTPException(status_code=404, detail="Interaction not found")
-        # Upsert: replace existing feedback for this interaction
         existing = (
             db.query(Feedback)
             .filter(Feedback.interaction_id == interaction_id)
@@ -192,33 +263,44 @@ async def submit_feedback(interaction_id: int, req: FeedbackRequest):
         if existing:
             existing.rating = req.rating
         else:
-            db.add(Feedback(interaction_id=interaction_id, rating=req.rating))
+            db.add(Feedback(
+                tenant_id=principal.tenant_id,
+                interaction_id=interaction_id,
+                rating=req.rating,
+            ))
         db.commit()
     return {"interaction_id": interaction_id, "rating": req.rating}
 
 
-# ── analytics (admin-only) ─────────────────────────────────────────────────────
+# ── analytics (admin-only, tenant-scoped) ────────────────────────────────────────
 
 @app.get("/analytics/stats")
-async def analytics_stats(_admin=Depends(get_current_admin)):
+async def analytics_stats(admin: Principal = Depends(require_admin)):
     with SessionLocal() as db:
-        stats = get_stats(db)
-        stats["daily_counts"] = get_daily_counts(db)
-        stats["confidence_distribution"] = get_confidence_distribution(db)
-        stats["feedback"] = get_feedback_stats(db)
+        stats = get_stats(db, admin.tenant_id)
+        stats["daily_counts"] = get_daily_counts(db, admin.tenant_id)
+        stats["confidence_distribution"] = get_confidence_distribution(db, admin.tenant_id)
+        stats["feedback"] = get_feedback_stats(db, admin.tenant_id)
         return stats
 
 
-@app.get("/analytics/gaps")
-async def analytics_gaps(_admin=Depends(get_current_admin)):
+@app.get("/analytics/usage")
+async def analytics_usage(admin: Principal = Depends(require_admin)):
+    """Token + USD cost dashboard for the tenant."""
     with SessionLocal() as db:
-        return {"gaps": get_gaps(db)}
+        return get_usage_stats(db, admin.tenant_id)
+
+
+@app.get("/analytics/gaps")
+async def analytics_gaps(admin: Principal = Depends(require_admin)):
+    with SessionLocal() as db:
+        return {"gaps": get_gaps(db, admin.tenant_id)}
 
 
 @app.get("/analytics/gaps/export")
-async def analytics_gaps_export(_admin=Depends(get_current_admin)):
+async def analytics_gaps_export(admin: Principal = Depends(require_admin)):
     with SessionLocal() as db:
-        gaps = get_gaps(db, limit=10_000)
+        gaps = get_gaps(db, admin.tenant_id, limit=10_000)
 
     output = io.StringIO()
     writer = csv.DictWriter(
@@ -236,18 +318,17 @@ async def analytics_gaps_export(_admin=Depends(get_current_admin)):
     )
 
 
-# ── suggestions (auto starter questions) ────────────────────────────────────────
+# ── suggestions (auto starter questions) ─────────────────────────────────────────
 
 @app.get("/suggestions")
-async def suggestions(n: int = 4):
-    """Auto-generated starter questions for the current document set."""
-    store = get_store()
+async def suggestions(n: int = 4, principal: Principal = Depends(get_principal)):
+    store = get_store(principal.tenant_id)
     if store.index is None or store.index.ntotal == 0:
         return {"suggestions": []}
     return {"suggestions": generate_suggestions(store, n=n)}
 
 
-# ── escalation (human handoff) ──────────────────────────────────────────────────
+# ── escalation (human handoff) ───────────────────────────────────────────────────
 
 class EscalateRequest(BaseModel):
     session_id: str = "default"
@@ -258,12 +339,12 @@ class EscalateRequest(BaseModel):
 
 
 @app.post("/escalate", status_code=201)
-async def escalate(req: EscalateRequest):
-    """Log a human-handoff ticket for an unanswered / low-confidence question."""
+async def escalate(req: EscalateRequest, principal: Principal = Depends(get_principal)):
     with SessionLocal() as db:
         ticket = Ticket(
+            tenant_id=principal.tenant_id,
             session_id=req.session_id,
-            question=req.question,
+            question=redact_pii(req.question),
             contact=req.contact,
             reason=req.reason,
             interaction_id=req.interaction_id,
@@ -279,9 +360,14 @@ async def escalate(req: EscalateRequest):
 
 
 @app.get("/tickets")
-async def list_tickets(_admin=Depends(get_current_admin)):
+async def list_tickets(admin: Principal = Depends(require_admin)):
     with SessionLocal() as db:
-        rows = db.query(Ticket).order_by(Ticket.created_at.desc()).all()
+        rows = (
+            db.query(Ticket)
+            .filter(Ticket.tenant_id == admin.tenant_id)
+            .order_by(Ticket.created_at.desc())
+            .all()
+        )
         return {
             "tickets": [
                 {
@@ -298,7 +384,7 @@ async def list_tickets(_admin=Depends(get_current_admin)):
         }
 
 
-# ── chat ───────────────────────────────────────────────────────────────────────
+# ── chat ─────────────────────────────────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
     question: str
@@ -306,37 +392,36 @@ class ChatRequest(BaseModel):
     chat_history: list[dict] = []
 
 
-def _get_history(req: ChatRequest) -> list[dict]:
+def _get_history(skey: str, req: ChatRequest) -> list[dict]:
     if req.chat_history:
         return req.chat_history
-    return memory_store.get(req.session_id).get()
+    return memory_store.get(skey).get()
 
 
-def _record_turn(session_id: str, question: str, response_text: str) -> None:
-    mem = memory_store.get(session_id)
+def _record_turn(skey: str, question: str, response_text: str) -> None:
+    mem = memory_store.get(skey)
     mem.add("user", question)
     mem.add("assistant", response_text)
 
 
 @app.post("/chat")
-async def chat(req: ChatRequest):
-    store = get_store()
+async def chat(req: ChatRequest, principal: Principal = Depends(rate_limit)):
+    tenant_id = principal.tenant_id
+    skey = _skey(tenant_id, req.session_id)
+    store = get_store(tenant_id)
     _require_docs(store)
-    history = _get_history(req)
+    history = _get_history(skey, req)
 
-    # Semantic cache: keyed by question embedding, scoped per session so one
-    # user's phrasing never returns another's answer.
+    # Semantic cache, scoped per (tenant, session).
     cache_eligible = settings.semantic_cache_enabled
     q_emb = None
     if cache_eligible:
         q_emb = get_embeddings().embed_query(req.question)
-        cached = semantic_cache.get(req.session_id, q_emb)
+        cached = semantic_cache.get(skey, q_emb)
         if cached is not None:
-            _record_turn(req.session_id, req.question, cached["answer"])
+            _record_turn(skey, req.question, cached["answer"])
             interaction_id = _log_interaction(
-                req.session_id,
-                req.question,
-                cached["answer"],
+                tenant_id, req.session_id, req.question, cached["answer"],
                 confidence=cached.get("confidence"),
                 low_confidence_warning=cached.get("low_confidence_warning", False),
             )
@@ -344,26 +429,29 @@ async def chat(req: ChatRequest):
 
     chunks = retrieve(req.question, store, k=5)
     result = answer(req.question, chunks, history)
-    _record_turn(req.session_id, req.question, result["answer"])
+    prompt_text = req.question + " " + " ".join(c.text for c, _ in chunks)
+    _record_turn(skey, req.question, result["answer"])
     interaction_id = _log_interaction(
-        req.session_id,
-        req.question,
-        result["answer"],
+        tenant_id, req.session_id, req.question, result["answer"],
         confidence=result.get("confidence"),
         low_confidence_warning=result.get("low_confidence_warning", False),
+        prompt_text=prompt_text,
     )
     if cache_eligible and q_emb is not None:
-        semantic_cache.put(req.session_id, q_emb, result)
+        semantic_cache.put(skey, q_emb, result)
     return {**result, "interaction_id": interaction_id}
 
 
 @app.post("/chat/stream")
-async def chat_stream(req: ChatRequest):
+async def chat_stream(req: ChatRequest, principal: Principal = Depends(rate_limit)):
     """Stream a grounded answer token-by-token via Server-Sent Events."""
-    store = get_store()
+    tenant_id = principal.tenant_id
+    skey = _skey(tenant_id, req.session_id)
+    store = get_store(tenant_id)
     _require_docs(store)
-    history = _get_history(req)
+    history = _get_history(skey, req)
     chunks = retrieve(req.question, store, k=5)
+    prompt_text = req.question + " " + " ".join(c.text for c, _ in chunks)
 
     async def _stream_and_record():
         full_answer: list[str] = []
@@ -382,14 +470,13 @@ async def chat_stream(req: ChatRequest):
                 yield sse
             elif evt.get("type") == "done":
                 answer_text = "".join(full_answer)
-                _record_turn(req.session_id, req.question, answer_text)
+                _record_turn(skey, req.question, answer_text)
                 try:
                     interaction_id = _log_interaction(
-                        req.session_id,
-                        req.question,
-                        answer_text,
+                        tenant_id, req.session_id, req.question, answer_text,
                         confidence=evt.get("confidence"),
                         low_confidence_warning=evt.get("low_confidence_warning", False),
+                        prompt_text=prompt_text,
                     )
                     evt["interaction_id"] = interaction_id
                 except Exception:

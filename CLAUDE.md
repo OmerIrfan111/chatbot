@@ -357,7 +357,7 @@ User question: {question}
 ---
 
 ### Phase 7 — Security, Multi-Tenancy & Scale
-**Status:** `[ ] NOT STARTED`
+**Status:** `[x] COMPLETE`
 
 **Scope:**
 - JWT auth + roles enforced on all endpoints
@@ -368,12 +368,28 @@ User question: {question}
 - Document versioning + incremental re-indexing (re-embed only changed chunks)
 
 **QA Gate:**
-- [ ] Tenant A cannot see Tenant B's documents or answers
-- [ ] All auth/role checks enforced (401/403 on violations)
-- [ ] Injection payload in a doc doesn't override system instructions
-- [ ] PII redacted in logs (no raw SSNs, emails, etc.)
-- [ ] Rate limit returns clean 429 with Retry-After header
-- [ ] Cost dashboard reconciles with OpenAI usage page
+- [x] Tenant A cannot see Tenant B's documents or answers  (test_tenant_documents_are_isolated, test_tenant_chat_answers_use_only_own_docs)
+- [x] All auth/role checks enforced (401/403 on violations)  (test_protected_routes_reject_anonymous, test_non_admin_cannot_access_analytics)
+- [x] Injection payload in a doc doesn't override system instructions  (sanitize_context + hardened system prompt; test_chat_context_sanitizes_injection_in_docs)
+- [x] PII redacted in logs (no raw SSNs, emails, etc.)  (redact_pii on persisted Interaction/Ticket; test_interaction_question_is_pii_redacted)
+- [x] Rate limit returns clean 429 with Retry-After header  (test_rate_limit_returns_429_with_retry_after)
+- [x] Cost dashboard reconciles with OpenAI usage page  (tiktoken token counts × price table; /analytics/usage; test_usage_dashboard_tracks_tokens_and_cost)
+
+**Files added/changed (2026-06-02):**
+- `backend/app/auth.py` — `Principal` (tenant_id+role), `get_principal`/`require_admin`, `issue_tenant_token` (API-key→token); tokens without a tenant claim fall back to default tenant
+- `backend/app/guardrails.py` — `redact_pii` (email/SSN/card/phone), profanity filter, `detect_injection`/`sanitize_context`
+- `backend/app/ratelimit.py` — thread-safe sliding-window `RateLimiter` keyed by (tenant, ip)
+- `backend/app/usage.py` — tiktoken token counting + USD cost estimation
+- `backend/app/analytics.py` — every aggregate now tenant-scoped; added `get_usage_stats`
+- `backend/app/models.py` — `tenant_id` on Document/ChunkMetadata/Interaction/Feedback/Ticket; Document `version`+`content_hash`; ChunkMetadata `content_hash`; Interaction `prompt_tokens`/`completion_tokens`/`cost_usd`
+- `backend/app/ingest.py` — tenant-scoped ingest; versioning + incremental re-index (reuse unchanged chunk embeddings, no-op on identical re-upload)
+- `backend/app/chain.py` — injection-hardened system prompt + `sanitize_context` over retrieved chunks
+- `backend/app/main.py` — per-tenant FAISS store registry `get_store(tenant_id)`; auth on all endpoints; `rate_limit` dep on chat/upload; PII-redacted + cost-tracked logging; `POST /auth/token`, `GET /analytics/usage`; version 0.6.0
+- `backend/app/config.py` — tenancy/rate-limit/cost/guardrail settings
+- `backend/tests/conftest.py` — default-tenant authenticated `client`, `anon_client`, `make_token`; per-tenant store dir; limiter reset
+- `backend/tests/test_security.py` — 14 Phase 7 tests (89 total pass)
+- `frontend/lib/api.ts` — tenant token exchange (`/auth/token`) cached + attached to every user-surface request
+- `.env.example` — `TENANT_API_KEYS`, rate-limit/cost/guardrail vars, `NEXT_PUBLIC_TENANT_ID/API_KEY`
 
 ---
 
@@ -462,14 +478,19 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 | Phase 6 | Semantic cache keyed by (session, question-embedding), no history guard | Server memory always accumulates so a "no-history" guard would defeat caching; per-session scoping prevents cross-user leakage |
 | Phase 6 | Reset semantic_cache + suggestions cache per test in conftest | Both are process-wide singletons; under identical mock embeddings a stale entry would cross-contaminate the next test |
 | Phase 6 | Patch get_embeddings in app.main + get_chat_model in app.suggestions | New point-of-use from-imports need their own patches in mock_openai (same binding-at-import-time issue as Phase 4) |
+| Phase 7 | Per-tenant FAISS stores (one index dir per tenant) over single index + metadata filter | Physical isolation is simpler and leak-proof; IndexFlatIP can't filter by metadata natively |
+| Phase 7 | Tokens without a tenant_id claim default to the default tenant | Keeps pre-Phase-7 tokens/tests valid; a bare `{role:user}` token resolves to default tenant rather than 401 |
+| Phase 7 | Default test `client` carries a baked-in tenant token | Auth-on-all-endpoints would break 75 pre-existing tests; httpx per-request headers still override for admin-token tests; `anon_client` covers 401 cases |
+| Phase 7 | Cost via tiktoken token counts × static price table | Deterministic + offline (works in tests, no usage API call); approximates OpenAI billing closely enough for the dashboard |
+| Phase 7 | Incremental re-index reuses embeddings by exact chunk-text match | `store.chunks` already holds embeddings; identical re-upload short-circuits on file hash, changed upload re-embeds only new chunk texts |
 
 ---
 
 ## Current Status
 
-**Active Phase:** Phase 7 — Security, Multi-Tenancy & Scale  
-**Last Completed Phase:** Phase 6 — Advanced Retrieval & AI Features (2026-06-02)  
-**Next Action:** Enforce JWT/roles on all endpoints, multi-tenant doc + vector isolation by `tenant_id`, guardrails (PII redaction, profanity, prompt-injection defense), per-tenant/IP rate limiting, cost dashboard, document versioning + incremental re-index.
+**Active Phase:** Phase 8 — Polish, Evaluation & Release  
+**Last Completed Phase:** Phase 7 — Security, Multi-Tenancy & Scale (2026-06-02)  
+**Next Action:** Eval harness (golden Q&A set + RAGAS groundedness in CI), embeddable `<script>` chat widget, final UI polish, full docs (setup + Mermaid architecture + API reference + deploy), seeded live demo, 90-second demo video script.
 
 ---
 

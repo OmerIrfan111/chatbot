@@ -50,23 +50,28 @@ def _isolated_store(tmp_path):
     ingest_module.SessionLocal = new_session
     main_module.SessionLocal = new_session
 
-    # ── Fresh FAISS store — injected before TestClient starts ─────────────
-    from app.vectorstore import FAISSVectorStore
+    # ── Per-tenant FAISS stores under a fresh temp dir ────────────────────
+    from app.config import get_settings
 
-    fresh_store = FAISSVectorStore(path=str(tmp_path / "faiss"))
-    main_module._store = fresh_store  # get_store() returns this; no OldPath loading
+    app_settings = get_settings()
+    old_vs_path = app_settings.vector_store_path
+    app_settings.vector_store_path = str(tmp_path / "vs")
+    main_module._stores.clear()  # registry rebuilt lazily per tenant
 
-    # ── Reset process-wide Phase 6 caches so tests don't cross-contaminate ─
+    # ── Reset process-wide caches + rate limiter (avoid cross-test bleed) ──
     from app.semantic_cache import semantic_cache
     import app.suggestions as suggestions_module
+    import app.ratelimit as ratelimit_module
 
     semantic_cache.clear()
     suggestions_module.clear_cache()
+    ratelimit_module._limiter = None  # rebuilt from current settings on demand
 
     yield
 
     # ── Restore originals ─────────────────────────────────────────────────
-    main_module._store = None
+    main_module._stores.clear()
+    app_settings.vector_store_path = old_vs_path
     db_module.engine = old_engine
     db_module.SessionLocal = old_session
     ingest_module.SessionLocal = old_ingest_session
@@ -113,7 +118,29 @@ def mock_openai():
 
 @pytest.fixture()
 def client(mock_openai):
-    """TestClient with mocked OpenAI and a fresh store."""
+    """TestClient authenticated as a default-tenant user (Phase 7).
+
+    A baked-in Authorization header keeps the pre-Phase-7 tests (which call
+    /upload, /chat, etc. without a token) working. Per-request headers — e.g.
+    an admin token from /auth/login — override this default in httpx.
+    """
+    from app.auth import create_access_token
+    from app.main import app
+
+    token = create_access_token({"sub": "user@default", "role": "user", "tenant_id": "default"})
+    with TestClient(app, headers={"Authorization": f"Bearer {token}"}) as c:
+        yield c
+
+
+@pytest.fixture()
+def anon_client(mock_openai):
+    """TestClient with no auth header — for testing 401 on protected routes."""
     from app.main import app
     with TestClient(app) as c:
         yield c
+
+
+def make_token(tenant_id: str = "default", role: str = "user", sub: str = "u") -> str:
+    """Helper for tests that need a token for a specific tenant/role."""
+    from app.auth import create_access_token
+    return create_access_token({"sub": sub, "role": role, "tenant_id": tenant_id})

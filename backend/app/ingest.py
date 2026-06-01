@@ -5,6 +5,7 @@ Supported formats: PDF, TXT, DOCX, CSV, Markdown, HTML
 Edge cases handled: empty files, corrupt files, oversized files, scanned PDFs (OCR fallback).
 """
 import csv
+import hashlib
 import io
 import logging
 from dataclasses import dataclass
@@ -181,8 +182,23 @@ def _detect_and_parse(filename: str, content_type: str, data: bytes) -> list[Par
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-async def ingest_file(file: UploadFile, store: FAISSVectorStore) -> int:
-    """Parse → chunk → embed → store. Returns the new document_id."""
+def _hash(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()
+
+
+async def ingest_file(
+    file: UploadFile,
+    store: FAISSVectorStore,
+    tenant_id: str = "default",
+) -> int:
+    """Parse → chunk → embed → store, scoped to a tenant.
+
+    On re-upload of the same filename:
+      - identical content  → no-op (no re-embedding), document untouched.
+      - changed content    → re-embed ONLY new/changed chunks, reuse the rest,
+        and bump the document version (incremental re-index).
+    Returns the document_id.
+    """
     data = await file.read()
     filename = file.filename or "upload"
     content_type = file.content_type or ""
@@ -197,25 +213,42 @@ async def ingest_file(file: UploadFile, store: FAISSVectorStore) -> int:
             "Split it into smaller files."
         )
 
+    file_hash = _hash(data.decode("utf-8", errors="replace"))
+
     pages = _detect_and_parse(filename, content_type, data)
     if not pages:
         raise ValueError("No text could be extracted from the file.")
 
-    # Persist document record
+    # ── Resolve target document (new vs. existing version) ────────────────────
     with SessionLocal() as db:
-        doc = Document(filename=filename, content_type=content_type)
-        db.add(doc)
-        db.commit()
-        db.refresh(doc)
-        document_id = doc.id
+        existing = (
+            db.query(Document)
+            .filter(Document.tenant_id == tenant_id, Document.filename == filename)
+            .first()
+        )
+        if existing and existing.content_hash == file_hash:
+            logger.info("Re-upload of '%s' is unchanged — skipping re-index.", filename)
+            return existing.id
 
-    # Build raw chunks with metadata
+        if existing:
+            document_id = existing.id
+            new_version = existing.version + 1
+        else:
+            doc = Document(tenant_id=tenant_id, filename=filename, content_type=content_type)
+            db.add(doc)
+            db.commit()
+            db.refresh(doc)
+            document_id = doc.id
+            new_version = 1
+
+    # ── Build raw chunks with metadata ────────────────────────────────────────
     raw: list[dict] = []
     for p in pages:
         for i, text in enumerate(_splitter.split_text(p.text)):
             raw.append({
                 "text": text,
                 "metadata": {
+                    "tenant_id": tenant_id,
                     "document_id": document_id,
                     "filename": filename,
                     "page": p.page,
@@ -226,35 +259,55 @@ async def ingest_file(file: UploadFile, store: FAISSVectorStore) -> int:
     if not raw:
         raise ValueError("Document produced no usable text chunks after splitting.")
 
-    # Embed in batches (prevents OOM on large docs)
+    # ── Incremental embedding: reuse embeddings for unchanged chunk text ──────
+    reuse: dict[str, list[float]] = {
+        c.text: c.embedding
+        for c in store.chunks
+        if c.metadata.get("document_id") == document_id and c.embedding
+    }
+    to_embed = [r for r in raw if r["text"] not in reuse]
+
     embedder = get_embeddings()
-    chunks: list[Chunk] = []
-    for start in range(0, len(raw), EMBED_BATCH):
-        batch = raw[start: start + EMBED_BATCH]
+    fresh: dict[str, list[float]] = {}
+    for start in range(0, len(to_embed), EMBED_BATCH):
+        batch = to_embed[start: start + EMBED_BATCH]
         embeddings = embedder.embed_documents([r["text"] for r in batch])
         for r, emb in zip(batch, embeddings):
-            chunks.append(Chunk(text=r["text"], metadata=r["metadata"], embedding=emb))
+            fresh[r["text"]] = emb
 
+    chunks: list[Chunk] = [
+        Chunk(text=r["text"], metadata=r["metadata"], embedding=reuse.get(r["text"]) or fresh[r["text"]])
+        for r in raw
+    ]
+
+    # Swap this document's vectors in the tenant store (old → new).
+    store.delete_by_document(document_id)
     store.add(chunks)
 
-    # Persist chunks to SQLite + update chunk count (atomic)
+    # ── Persist chunk metadata + bump version (atomic) ────────────────────────
     with SessionLocal() as db:
-        # Remove any stale chunks for this document (idempotent re-index)
         db.query(ChunkMetadata).filter(ChunkMetadata.document_id == document_id).delete()
-
         for chunk in chunks:
             m = chunk.metadata
             db.add(ChunkMetadata(
+                tenant_id=tenant_id,
                 document_id=m["document_id"],
                 chunk_index=m["chunk_index"],
                 page=m["page"],
                 text=chunk.text,
+                content_hash=_hash(chunk.text),
             ))
 
         doc_row = db.get(Document, document_id)
         if doc_row:
             doc_row.chunk_count = len(chunks)
+            doc_row.version = new_version
+            doc_row.content_hash = file_hash
+            doc_row.content_type = content_type
         db.commit()
 
-    logger.info("Ingested '%s': %d pages, %d chunks", filename, len(pages), len(chunks))
+    logger.info(
+        "Ingested '%s' (tenant=%s, v%d): %d chunks, %d newly embedded",
+        filename, tenant_id, new_version, len(chunks), len(to_embed),
+    )
     return document_id

@@ -12,9 +12,13 @@ class Document(Base):
     __tablename__ = "documents"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    tenant_id: Mapped[str] = mapped_column(index=True, nullable=False, default="default")
     filename: Mapped[str] = mapped_column(nullable=False)
     content_type: Mapped[str] = mapped_column(nullable=False, default="")
     chunk_count: Mapped[int] = mapped_column(default=0)
+    # Versioning (Phase 7): bumped on re-upload; hash skips no-op re-indexes.
+    version: Mapped[int] = mapped_column(default=1)
+    content_hash: Mapped[str] = mapped_column(default="", index=True)
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
 
 
@@ -23,12 +27,15 @@ class ChunkMetadata(Base):
     __tablename__ = "chunk_metadata"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    tenant_id: Mapped[str] = mapped_column(index=True, nullable=False, default="default")
     document_id: Mapped[int] = mapped_column(
         ForeignKey("documents.id", ondelete="CASCADE"), index=True, nullable=False
     )
     chunk_index: Mapped[int] = mapped_column(nullable=False)
     page: Mapped[int] = mapped_column(nullable=False, default=1)
     text: Mapped[str] = mapped_column(Text, nullable=False)
+    # Per-chunk hash enables incremental re-indexing (re-embed only changed chunks).
+    content_hash: Mapped[str] = mapped_column(default="", index=True)
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
 
 
@@ -50,12 +57,18 @@ class Interaction(Base):
     __tablename__ = "interactions"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    tenant_id: Mapped[str] = mapped_column(index=True, nullable=False, default="default")
     session_id: Mapped[str] = mapped_column(index=True, nullable=False)
+    # Stored PII-redacted (Phase 7 guardrails).
     question: Mapped[str] = mapped_column(Text, nullable=False)
     answer: Mapped[str] = mapped_column(Text, nullable=False)
     confidence: Mapped[float] = mapped_column(Float, nullable=True)
     low_confidence_warning: Mapped[bool] = mapped_column(default=False)
     is_refusal: Mapped[bool] = mapped_column(default=False)
+    # Cost tracking (Phase 7).
+    prompt_tokens: Mapped[int] = mapped_column(default=0)
+    completion_tokens: Mapped[int] = mapped_column(default=0)
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
 
 
@@ -64,6 +77,7 @@ class Feedback(Base):
     __tablename__ = "feedback"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    tenant_id: Mapped[str] = mapped_column(index=True, nullable=False, default="default")
     interaction_id: Mapped[int] = mapped_column(
         ForeignKey("interactions.id", ondelete="CASCADE"), index=True, nullable=False
     )
@@ -76,6 +90,7 @@ class Ticket(Base):
     __tablename__ = "tickets"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    tenant_id: Mapped[str] = mapped_column(index=True, nullable=False, default="default")
     session_id: Mapped[str] = mapped_column(index=True, nullable=False)
     question: Mapped[str] = mapped_column(Text, nullable=False)
     # Optional link back to the low-confidence interaction that triggered it.

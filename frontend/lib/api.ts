@@ -11,12 +11,43 @@ import type {
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+// ── tenant auth (Phase 7) ───────────────────────────────────────────────────────
+// The end-user/widget surface authenticates with a tenant-scoped token obtained
+// by exchanging a tenant API key. Cached for the session.
+
+const TENANT_ID = process.env.NEXT_PUBLIC_TENANT_ID ?? "default";
+const TENANT_API_KEY = process.env.NEXT_PUBLIC_TENANT_API_KEY ?? "demo-key";
+
+let _tokenPromise: Promise<string> | null = null;
+
+async function getTenantToken(): Promise<string> {
+  if (!_tokenPromise) {
+    _tokenPromise = fetch(`${BASE}/auth/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tenant_id: TENANT_ID, api_key: TENANT_API_KEY }),
+    })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("auth failed"))))
+      .then((d) => d.access_token as string)
+      .catch(() => {
+        _tokenPromise = null; // allow retry on next call
+        return "";
+      });
+  }
+  return _tokenPromise;
+}
+
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = await getTenantToken();
   const res = await fetch(`${BASE}${path}`, {
     ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init?.headers,
+    },
   });
   if (!res.ok) {
     const body = await res.text();
@@ -38,7 +69,12 @@ export async function fetchDocuments(): Promise<Document[]> {
 export async function uploadDocument(file: File): Promise<{ document_id: number; filename: string; status: string }> {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${BASE}/upload`, { method: "POST", body: form });
+  const token = await getTenantToken();
+  const res = await fetch(`${BASE}/upload`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
   if (!res.ok) {
     const body = await res.text();
     throw new Error(body || `Upload failed: HTTP ${res.status}`);
@@ -47,7 +83,11 @@ export async function uploadDocument(file: File): Promise<{ document_id: number;
 }
 
 export async function deleteDocument(id: number): Promise<void> {
-  const res = await fetch(`${BASE}/documents/${id}`, { method: "DELETE" });
+  const token = await getTenantToken();
+  const res = await fetch(`${BASE}/documents/${id}`, {
+    method: "DELETE",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   if (!res.ok && res.status !== 204) {
     throw new Error(`Delete failed: HTTP ${res.status}`);
   }
@@ -65,9 +105,13 @@ export async function sendChat(req: ChatRequest): Promise<ChatResponse> {
 // ── chat (SSE streaming) ──────────────────────────────────────────────────────
 
 export async function* streamChat(req: ChatRequest): AsyncGenerator<SSEEvent> {
+  const token = await getTenantToken();
   const res = await fetch(`${BASE}/chat/stream`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify(req),
   });
 

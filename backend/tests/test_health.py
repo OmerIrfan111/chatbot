@@ -10,3 +10,4 @@ def test_health():
     data = response.json()
     assert data["status"] == "ok"
     assert "version" in data
+    assert "indexed_chunks" in data

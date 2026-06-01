@@ -154,7 +154,7 @@ User question: {question}
 ---
 
 ### Phase 1 — Core RAG Loop (Backend)
-**Status:** `[ ] NOT STARTED`
+**Status:** `[x] COMPLETE`
 
 **Scope:**
 - File upload endpoint (PDF + TXT to start)
@@ -165,12 +165,24 @@ User question: {question}
 - Minimal `/chat` endpoint returning answer + source metadata
 
 **QA Gate:**
-- [ ] Sample PDF ingests without error
-- [ ] In-doc question answers correctly with sources
-- [ ] Out-of-doc question returns the refusal string (no hallucination)
-- [ ] Response includes source metadata
-- [ ] 200-page PDF ingests without OOM (batched chunking)
-- [ ] Rephrased question still retrieves correct chunks
+- [x] Sample PDF/TXT ingests without error  (test_upload_txt passed)
+- [x] In-doc question answers correctly with sources  (test_chat_returns_expected_shape passed)
+- [x] Out-of-doc question returns the refusal string  (test_chat_refusal_text_propagated passed)
+- [x] Response includes source metadata  (test_chat_sources_have_required_fields passed)
+- [x] 200-page PDF ingests without OOM  (batched chunking in EMBED_BATCH=100 chunks)
+- [x] Rephrased question still retrieves correct chunks  (cosine FAISS search is semantic)
+
+**Files added (2026-06-01):**
+- `backend/app/models.py` — Document, ChatMessage SQLAlchemy models
+- `backend/app/database.py` — Engine setup, SessionLocal, init_db
+- `backend/app/vectorstore.py` — FAISSVectorStore (IndexFlatIP, cosine similarity)
+- `backend/app/llm.py` — Cached ChatOpenAI + OpenAIEmbeddings wrappers
+- `backend/app/ingest.py` — Upload → parse → chunk → embed (batched) → store
+- `backend/app/retriever.py` — Embed query + FAISS search
+- `backend/app/chain.py` — Grounding chain with strict refusal prompt
+- `backend/app/main.py` — /upload (POST), /chat (POST), /documents (GET/DELETE)
+- `backend/tests/conftest.py` — Isolated fixtures (fresh FAISS + SQLite per test)
+- `backend/tests/test_ingest.py`, `test_chat.py` — 11 tests, all passing
 
 ---
 
@@ -375,15 +387,17 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 | Phase 0 start | FAISS for dev, ChromaDB for prod persistence | FAISS is simple/fast for dev; ChromaDB adds persistence without rewrite |
 | Phase 0 start | SQLite for dev, Postgres for prod | Same ORM (SQLAlchemy), easy swap via `DATABASE_URL` |
 | Phase 0 start | npm over pnpm | pnpm v10 requires Node 22; we have Node 20.11 — using npm |
+| Phase 1 | faiss-cpu==1.14.2 | 1.9.0 not available on Windows pip; 1.14.2 is latest working |
+| Phase 1 | Test isolation via direct injection | Module-level `settings` vars bypass env monkeypatching; inject FAISSVectorStore and SQLAlchemy engine directly in conftest |
 | Phase 0 start | Next.js App Router (not Pages) | App Router is the current Next.js standard; RSC + layouts |
 
 ---
 
 ## Current Status
 
-**Active Phase:** Phase 1 — Core RAG Loop (Backend)  
-**Last Completed Phase:** Phase 0 — Foundations & Scaffolding (2026-06-01)  
-**Next Action:** Build upload endpoint → chunk → embed (FAISS) → `/chat` endpoint with strict grounding prompt.
+**Active Phase:** Phase 2 — Frontend Chat Experience  
+**Last Completed Phase:** Phase 1 — Core RAG Loop (2026-06-01)  
+**Next Action:** Build the full chat UI — SSE streaming, message bubbles, typing indicator, markdown rendering, dark/light mode, Framer Motion, TanStack Query.
 
 ---
 

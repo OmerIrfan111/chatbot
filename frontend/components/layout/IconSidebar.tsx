@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Plus, Home, Folder, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -15,31 +15,36 @@ function SidebarIcon({
   icon,
   label,
   onClick,
+  href,
   active = false,
 }: {
   icon: React.ReactNode;
   label: string;
   onClick?: () => void;
+  href?: string;
   active?: boolean;
 }) {
+  const cls = cn(
+    "flex h-9 w-9 items-center justify-center rounded-xl transition-colors",
+    active
+      ? "bg-[var(--ink)] text-[var(--bg)]"
+      : "text-[var(--ink-soft)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
+  );
+
+  // Navigation uses a real Link (reliable + prefetched); actions use a button.
+  const trigger = href ? (
+    <Link href={href} prefetch className={cls} aria-label={label}>
+      {icon}
+    </Link>
+  ) : (
+    <button onClick={onClick} className={cls} aria-label={label}>
+      {icon}
+    </button>
+  );
+
   return (
     <Tooltip>
-      <TooltipTrigger
-        render={
-          <button
-            onClick={onClick}
-            className={cn(
-              "flex h-9 w-9 items-center justify-center rounded-xl transition-colors",
-              active
-                ? "bg-[var(--ink)] text-[var(--bg)]"
-                : "text-[var(--ink-soft)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
-            )}
-            aria-label={label}
-          >
-            {icon}
-          </button>
-        }
-      />
+      <TooltipTrigger render={trigger} />
       <TooltipContent side="right" className="text-xs">
         {label}
       </TooltipContent>
@@ -48,20 +53,17 @@ function SidebarIcon({
 }
 
 export function IconSidebar({ onFolderClick, folderActive }: IconSidebarProps) {
-  const router = useRouter();
   const clearMessages = useChatStore((s) => s.clearMessages);
 
   return (
     <aside className="relative z-10 flex flex-col items-center w-[60px] shrink-0 py-4 gap-1 bg-[var(--surface)] border-r border-[var(--line)]">
-      {/* Logo — 4-point star motif (ties to the hero) */}
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--ink)] mb-3 shrink-0">
-        <svg viewBox="0 0 20 20" className="h-4 w-4">
-          <path
-            d="M10 1 C 11 6 14 9 19 10 C 14 11 11 14 10 19 C 9 14 6 11 1 10 C 6 9 9 6 10 1 Z"
-            fill="var(--accent)"
-          />
+      {/* Logo — brand mark */}
+      <Link href="/" aria-label="Mutex home" className="flex h-9 w-9 items-center justify-center mb-3 shrink-0">
+        <svg viewBox="0 0 120 80" className="w-7 text-[var(--ink)]" fill="currentColor">
+          <path d="M8 72 L8 40 C8 28 19 18 34 18 C49 18 60 28 60 40 L60 72 L46 72 L46 41 C46 35 41 31 34 31 C27 31 22 35 22 41 L22 72 Z" />
+          <path d="M68 72 L68 40 L112 12 L112 72 L98 72 L98 34 L82 44 L82 72 Z" />
         </svg>
-      </div>
+      </Link>
 
       {/* Nav icons */}
       <SidebarIcon
@@ -72,8 +74,8 @@ export function IconSidebar({ onFolderClick, folderActive }: IconSidebarProps) {
       <SidebarIcon
         icon={<Home className="h-4 w-4" />}
         label="Home"
+        href="/"
         active
-        onClick={() => router.push("/")}
       />
       <SidebarIcon
         icon={<Folder className="h-4 w-4" />}
@@ -89,7 +91,7 @@ export function IconSidebar({ onFolderClick, folderActive }: IconSidebarProps) {
       <SidebarIcon
         icon={<Settings className="h-4 w-4" />}
         label="Admin dashboard"
-        onClick={() => router.push("/admin")}
+        href="/admin"
       />
     </aside>
   );

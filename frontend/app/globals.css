@@ -46,11 +46,11 @@
   .animate-glow-drift { animation: glow-drift 14s ease-in-out infinite; }
   .animate-rise-in { animation: rise-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
-  /* Oversized display heading — tight, confident, editorial. */
+  /* Oversized display heading — light, refined, editorial. */
   .display-xl {
-    font-weight: 800;
-    letter-spacing: -0.04em;
-    line-height: 0.92;
+    font-weight: 500;
+    letter-spacing: -0.025em;
+    line-height: 1.02;
   }
 }
 

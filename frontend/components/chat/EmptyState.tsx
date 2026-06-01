@@ -17,43 +17,6 @@ interface EmptyStateProps {
   hasDocuments: boolean;
 }
 
-/* Metallic 4-point star — the brand motif, echoing the logo. */
-function StarMotif() {
-  const star =
-    "M110 6 C118 70 150 102 214 110 C150 118 118 150 110 214 C102 150 70 118 6 110 C70 102 102 70 110 6 Z";
-  return (
-    <div className="relative flex items-center justify-center">
-      {/* ambient chartreuse glow */}
-      <div
-        aria-hidden
-        className="absolute h-48 w-48 rounded-full animate-glow-drift"
-        style={{ background: "var(--accent-glow)", filter: "blur(56px)" }}
-      />
-      <svg
-        viewBox="0 0 220 220"
-        className="relative h-28 w-28 animate-star-float"
-        style={{ filter: "drop-shadow(0 18px 30px rgba(20,20,16,0.18))" }}
-        aria-hidden
-      >
-        <defs>
-          <linearGradient id="metal" x1="0.2" y1="0" x2="0.7" y2="1">
-            <stop offset="0%" stopColor="#ffffff" />
-            <stop offset="40%" stopColor="#ECECE6" />
-            <stop offset="64%" stopColor="#A6A69E" />
-            <stop offset="100%" stopColor="#D2D2CA" />
-          </linearGradient>
-          <radialGradient id="sheen" cx="0.36" cy="0.30" r="0.7">
-            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
-            <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-          </radialGradient>
-        </defs>
-        <path d={star} fill="url(#metal)" />
-        <path d={star} fill="url(#sheen)" />
-      </svg>
-    </div>
-  );
-}
-
 export function EmptyState({ onSuggestion, hasDocuments }: EmptyStateProps) {
   const [prompts, setPrompts] = useState<string[]>(FALLBACK_PROMPTS);
   const [aiGenerated, setAiGenerated] = useState(false);
@@ -78,21 +41,12 @@ export function EmptyState({ onSuggestion, hasDocuments }: EmptyStateProps) {
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-6 py-12 max-w-4xl w-full mx-auto text-center">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-        className="mb-7"
-      >
-        <StarMotif />
-      </motion.div>
-
       {/* Heading */}
       <motion.h1
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.55, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
-        className="display-xl text-[clamp(2.6rem,6vw,4.6rem)] text-[var(--ink)]"
+        className="display-xl text-[clamp(2.4rem,5.2vw,4rem)] text-[var(--ink)]"
       >
         Hello, I&apos;m Mutex
       </motion.h1>

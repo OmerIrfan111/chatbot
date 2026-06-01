@@ -1,17 +1,28 @@
+import csv
+import io
+import json
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app.chain import answer, answer_stream
+from app.analytics import (
+    get_confidence_distribution,
+    get_daily_counts,
+    get_feedback_stats,
+    get_gaps,
+    get_stats,
+)
+from app.auth import create_access_token, get_current_admin
+from app.chain import REFUSAL, answer, answer_stream
 from app.config import get_settings
 from app.database import SessionLocal, init_db
 from app.ingest import ingest_file
 from app.memory import memory_store
-from app.models import ChunkMetadata, Document
+from app.models import ChunkMetadata, Document, Feedback, Interaction
 from app.retriever import retrieve
 from app.vectorstore import FAISSVectorStore
 
@@ -35,6 +46,30 @@ def _require_docs(store: FAISSVectorStore) -> None:
         )
 
 
+def _log_interaction(
+    session_id: str,
+    question: str,
+    answer_text: str,
+    confidence: Optional[float],
+    low_confidence_warning: bool,
+) -> int:
+    """Persist an interaction and return its ID."""
+    is_refusal = REFUSAL.lower() in answer_text.lower()
+    with SessionLocal() as db:
+        row = Interaction(
+            session_id=session_id,
+            question=question,
+            answer=answer_text,
+            confidence=confidence,
+            low_confidence_warning=low_confidence_warning,
+            is_refusal=is_refusal,
+        )
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+        return row.id
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -42,7 +77,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="AI Support Agent API (mutex)", version="0.3.0", lifespan=lifespan)
+app = FastAPI(title="AI Support Agent API (mutex)", version="0.4.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -98,7 +133,6 @@ async def delete_document(document_id: int):
     store = get_store()
     store.delete_by_document(document_id)
     with SessionLocal() as db:
-        # ChunkMetadata rows are CASCADE-deleted with the document
         doc = db.get(Document, document_id)
         if doc:
             db.delete(doc)
@@ -109,7 +143,6 @@ async def delete_document(document_id: int):
 
 @app.delete("/sessions/{session_id}", status_code=204)
 async def clear_session(session_id: str):
-    """Clear the conversation memory for a session."""
     memory_store.delete(session_id)
 
 
@@ -118,17 +151,97 @@ async def list_sessions():
     return {"sessions": memory_store.list_sessions()}
 
 
+# ── auth ───────────────────────────────────────────────────────────────────────
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+@app.post("/auth/login")
+async def login(req: LoginRequest):
+    if req.email != settings.admin_email or req.password != settings.admin_password:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    token = create_access_token({"sub": req.email, "role": "admin"})
+    return {"access_token": token, "token_type": "bearer"}
+
+
+# ── feedback ───────────────────────────────────────────────────────────────────
+
+class FeedbackRequest(BaseModel):
+    rating: int  # 1 = thumbs up, -1 = thumbs down
+
+
+@app.post("/feedback/{interaction_id}", status_code=201)
+async def submit_feedback(interaction_id: int, req: FeedbackRequest):
+    if req.rating not in (1, -1):
+        raise HTTPException(status_code=422, detail="Rating must be 1 or -1")
+    with SessionLocal() as db:
+        interaction = db.get(Interaction, interaction_id)
+        if not interaction:
+            raise HTTPException(status_code=404, detail="Interaction not found")
+        # Upsert: replace existing feedback for this interaction
+        existing = (
+            db.query(Feedback)
+            .filter(Feedback.interaction_id == interaction_id)
+            .first()
+        )
+        if existing:
+            existing.rating = req.rating
+        else:
+            db.add(Feedback(interaction_id=interaction_id, rating=req.rating))
+        db.commit()
+    return {"interaction_id": interaction_id, "rating": req.rating}
+
+
+# ── analytics (admin-only) ─────────────────────────────────────────────────────
+
+@app.get("/analytics/stats")
+async def analytics_stats(_admin=Depends(get_current_admin)):
+    with SessionLocal() as db:
+        stats = get_stats(db)
+        stats["daily_counts"] = get_daily_counts(db)
+        stats["confidence_distribution"] = get_confidence_distribution(db)
+        stats["feedback"] = get_feedback_stats(db)
+        return stats
+
+
+@app.get("/analytics/gaps")
+async def analytics_gaps(_admin=Depends(get_current_admin)):
+    with SessionLocal() as db:
+        return {"gaps": get_gaps(db)}
+
+
+@app.get("/analytics/gaps/export")
+async def analytics_gaps_export(_admin=Depends(get_current_admin)):
+    with SessionLocal() as db:
+        gaps = get_gaps(db, limit=10_000)
+
+    output = io.StringIO()
+    writer = csv.DictWriter(
+        output,
+        fieldnames=["id", "question", "confidence", "is_refusal", "created_at"],
+    )
+    writer.writeheader()
+    writer.writerows(gaps)
+    output.seek(0)
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=gaps.csv"},
+    )
+
+
 # ── chat ───────────────────────────────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
     question: str
     session_id: str = "default"
-    # If provided, used directly; otherwise server-side memory is used
     chat_history: list[dict] = []
 
 
 def _get_history(req: ChatRequest) -> list[dict]:
-    """Return client-provided history or fall back to server-side memory."""
     if req.chat_history:
         return req.chat_history
     return memory_store.get(req.session_id).get()
@@ -148,7 +261,14 @@ async def chat(req: ChatRequest):
     chunks = retrieve(req.question, store, k=5)
     result = answer(req.question, chunks, history)
     _record_turn(req.session_id, req.question, result["answer"])
-    return result
+    interaction_id = _log_interaction(
+        req.session_id,
+        req.question,
+        result["answer"],
+        confidence=result.get("confidence"),
+        low_confidence_warning=result.get("low_confidence_warning", False),
+    )
+    return {**result, "interaction_id": interaction_id}
 
 
 @app.post("/chat/stream")
@@ -159,23 +279,38 @@ async def chat_stream(req: ChatRequest):
     history = _get_history(req)
     chunks = retrieve(req.question, store, k=5)
 
-    # We need to capture the full answer to persist in memory after streaming.
-    # Wrap the generator to intercept the "done" event.
     async def _stream_and_record():
-        full_answer = []
+        full_answer: list[str] = []
         async for sse in answer_stream(req.question, chunks, history):
-            yield sse
-            # Parse token content to reconstruct the answer
-            if sse.startswith("data: "):
-                import json
+            if not sse.startswith("data: "):
+                yield sse
+                continue
+            try:
+                evt = json.loads(sse[6:])
+            except Exception:
+                yield sse
+                continue
+
+            if evt.get("type") == "token":
+                full_answer.append(evt.get("content", ""))
+                yield sse
+            elif evt.get("type") == "done":
+                answer_text = "".join(full_answer)
+                _record_turn(req.session_id, req.question, answer_text)
                 try:
-                    evt = json.loads(sse[6:])
-                    if evt.get("type") == "token":
-                        full_answer.append(evt.get("content", ""))
-                    elif evt.get("type") == "done":
-                        _record_turn(req.session_id, req.question, "".join(full_answer))
+                    interaction_id = _log_interaction(
+                        req.session_id,
+                        req.question,
+                        answer_text,
+                        confidence=evt.get("confidence"),
+                        low_confidence_warning=evt.get("low_confidence_warning", False),
+                    )
+                    evt["interaction_id"] = interaction_id
                 except Exception:
-                    pass
+                    evt["interaction_id"] = None
+                yield f"data: {json.dumps(evt)}\n\n"
+            else:
+                yield sse
 
     return StreamingResponse(
         _stream_and_record(),

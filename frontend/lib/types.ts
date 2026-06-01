@@ -21,6 +21,8 @@ export interface ChatMessage {
   confidence?: number;
   low_confidence_warning?: boolean;
   conflict_warning?: ConflictWarning | null;
+  interaction_id?: number | null;
+  feedback?: 1 | -1 | null;
   /** true while SSE tokens are still arriving */
   streaming?: boolean;
   timestamp: Date;
@@ -45,11 +47,19 @@ export interface ChatResponse {
   confidence: number;
   low_confidence_warning: boolean;
   conflict_warning: ConflictWarning | null;
+  interaction_id: number | null;
 }
 
 export type SSEEvent =
   | { type: "token"; content: string }
-  | { type: "done"; sources: Source[]; confidence: number; low_confidence_warning: boolean; conflict_warning: ConflictWarning | null }
+  | {
+      type: "done";
+      sources: Source[];
+      confidence: number;
+      low_confidence_warning: boolean;
+      conflict_warning: ConflictWarning | null;
+      interaction_id: number | null;
+    }
   | { type: "error"; message: string };
 
 export type UploadStatus = "idle" | "uploading" | "processing" | "ready" | "error";
@@ -59,4 +69,41 @@ export interface PendingUpload {
   file: File;
   status: UploadStatus;
   error?: string;
+}
+
+// ── Admin / Analytics ─────────────────────────────────────────────────────────
+
+export interface DailyCount {
+  date: string;
+  count: number;
+}
+
+export interface ConfidenceDistribution {
+  high: number;
+  medium: number;
+  low: number;
+}
+
+export interface FeedbackStats {
+  thumbs_up: number;
+  thumbs_down: number;
+  total: number;
+}
+
+export interface AdminStats {
+  total_questions: number;
+  answer_rate: number;
+  avg_confidence: number;
+  questions_today: number;
+  daily_counts: DailyCount[];
+  confidence_distribution: ConfidenceDistribution;
+  feedback: FeedbackStats;
+}
+
+export interface GapItem {
+  id: number;
+  question: string;
+  confidence: number | null;
+  is_refusal: boolean;
+  created_at: string;
 }

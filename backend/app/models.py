@@ -1,4 +1,4 @@
-from sqlalchemy import Column, ForeignKey, Integer, String, Float, DateTime, Text
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Float, DateTime, Text
 from sqlalchemy.orm import declarative_base
 from datetime import datetime, timezone
 
@@ -35,4 +35,33 @@ class ChatMessage(Base):
     role = Column(String, nullable=False)  # "user" | "assistant"
     content = Column(Text, nullable=False)
     confidence = Column(Float, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class Interaction(Base):
+    """Persists every Q&A turn for analytics and the admin dashboard."""
+    __tablename__ = "interactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String, index=True, nullable=False)
+    question = Column(Text, nullable=False)
+    answer = Column(Text, nullable=False)
+    confidence = Column(Float, nullable=True)
+    low_confidence_warning = Column(Boolean, default=False)
+    is_refusal = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class Feedback(Base):
+    """Thumbs up (+1) / thumbs down (-1) per interaction."""
+    __tablename__ = "feedback"
+
+    id = Column(Integer, primary_key=True, index=True)
+    interaction_id = Column(
+        Integer,
+        ForeignKey("interactions.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    rating = Column(Integer, nullable=False)  # 1 = thumbs up, -1 = thumbs down
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

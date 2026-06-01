@@ -288,7 +288,7 @@ User question: {question}
 ---
 
 ### Phase 5 — Admin Dashboard & Analytics
-**Status:** `[ ] NOT STARTED`
+**Status:** `[x] COMPLETE`
 
 **Scope:**
 - Log every question, answer, confidence score, citations to DB
@@ -300,11 +300,24 @@ User question: {question}
 - Feedback stats view
 
 **QA Gate:**
-- [ ] All interactions logged and visible in dashboard
-- [ ] Stats and charts accurate on a known dataset
-- [ ] Gap table populated and CSV export works
-- [ ] Feedback (thumbs) persists across sessions
-- [ ] Admin pages return 403 to non-admin users
+- [x] All interactions logged and visible in dashboard  (test_interaction_logged_in_db, test_analytics_stats_counts_interactions)
+- [x] Stats and charts accurate on a known dataset  (test_analytics_stats_shape, daily_counts/confidence_distribution in response)
+- [x] Gap table populated and CSV export works  (test_analytics_gaps_shape, test_analytics_gaps_export_csv)
+- [x] Feedback (thumbs) persists across sessions  (test_feedback_persists_in_db, test_feedback_upsert, test_feedback_reflected_in_analytics)
+- [x] Admin pages return 403 to non-admin users  (test_analytics_rejects_non_admin_token)
+
+**Files added/changed (2026-06-01):**
+- `backend/app/models.py` — `Interaction` (Q&A log) + `Feedback` (thumbs up/down) models
+- `backend/app/auth.py` — JWT auth: `create_access_token`, `get_current_admin` dependency
+- `backend/app/analytics.py` — `get_stats`, `get_daily_counts`, `get_confidence_distribution`, `get_gaps`, `get_feedback_stats`
+- `backend/app/main.py` — `POST /auth/login`, `POST /feedback/{id}`, `GET /analytics/stats|gaps|gaps/export`; `_log_interaction` wired into `/chat` + `/chat/stream`; version 0.4.0
+- `backend/tests/test_analytics.py` — 18 Phase 5 tests, all passing
+- `frontend/lib/types.ts` — `AdminStats`, `GapItem`, `FeedbackStats`, `DailyCount`, `interaction_id` on `ChatMessage`/SSE
+- `frontend/lib/api.ts` — `submitFeedback`, `adminLogin`, `fetchAdminStats`, `fetchGaps`, `gapsExportUrl`
+- `frontend/store/chat.ts` — `interaction_id` + `feedback` per message, `setFeedback` action
+- `frontend/lib/hooks/useChat.ts` — passes `interaction_id` through `finalizeAssistant`
+- `frontend/components/chat/Message.tsx` — `FeedbackButtons` (thumbs up/down, optimistic UI)
+- `frontend/app/admin/page.tsx` — full admin dashboard: login gate, stat cards, LineChart, BarChart, PieChart (Recharts), gap table, CSV export
 
 ---
 
@@ -427,14 +440,16 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 | Phase 4 | FAKE_EMBEDDING extracted to tests/constants.py | `from conftest import X` fails at runtime — conftest isn't a standard importable module; shared constants must live in a plain .py file |
 | Phase 4 | Patch SessionLocal in app.ingest + app.main in _isolated_store | Modules that do `from app.database import SessionLocal` bind the name at import time; patching db_module.SessionLocal alone doesn't propagate to those references |
 | Phase 4 | FK pragma added to test engine | SQLite CASCADE deletes require `PRAGMA foreign_keys=ON` per connection; test engine must register this listener explicitly |
+| Phase 5 | python-jose not installed | `python-jose[cryptography]` was in requirements.txt but not in the active Python environment; run `pip install python-jose[cryptography] passlib[bcrypt]` |
+| Phase 5 | JWT stored in localStorage | Acceptable for portfolio/demo; production would use httpOnly cookies |
 
 ---
 
 ## Current Status
 
-**Active Phase:** Phase 5 — Admin Dashboard & Analytics  
-**Last Completed Phase:** Phase 4 — Citations & Confidence (2026-06-01)  
-**Next Action:** Log every question/answer/confidence/citations to DB, add thumbs up/down feedback, build admin route (JWT admin role), stat cards, Recharts charts, gap table with CSV export.
+**Active Phase:** Phase 6 — Advanced Retrieval & AI Features  
+**Last Completed Phase:** Phase 5 — Admin Dashboard & Analytics (2026-06-01)  
+**Next Action:** Hybrid retrieval (FAISS + BM25), cross-encoder reranker, semantic caching, auto-suggested starter questions, language detection + multilingual answers, human escalation handoff.
 
 ---
 

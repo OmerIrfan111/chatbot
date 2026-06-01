@@ -6,11 +6,12 @@ import { streamChat } from "@/lib/api";
 import { useChatStore } from "@/store/chat";
 
 const EMPTY_FINALIZE = {
-  sources: [],
+  sources: [] as import("@/lib/types").Source[],
   confidence: 0,
   low_confidence_warning: false,
   conflict_warning: null,
-} as const;
+  interaction_id: null,
+};
 
 export function useChat() {
   const {
@@ -45,6 +46,7 @@ export function useChat() {
               confidence: event.confidence,
               low_confidence_warning: event.low_confidence_warning ?? false,
               conflict_warning: event.conflict_warning ?? null,
+              interaction_id: event.interaction_id ?? null,
             });
           } else if (event.type === "error") {
             finalizeAssistant(assistantId, EMPTY_FINALIZE);

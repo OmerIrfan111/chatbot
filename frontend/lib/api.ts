@@ -1,4 +1,4 @@
-import type { ChatRequest, ChatResponse, Document, SSEEvent } from "./types";
+import type { AdminStats, ChatRequest, ChatResponse, Document, GapItem, SSEEvent } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -14,6 +14,10 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(body || `HTTP ${res.status}`);
   }
   return res.json() as Promise<T>;
+}
+
+function authHeader(token: string): HeadersInit {
+  return { Authorization: `Bearer ${token}` };
 }
 
 // ── documents ─────────────────────────────────────────────────────────────────
@@ -90,4 +94,42 @@ export async function* streamChat(req: ChatRequest): AsyncGenerator<SSEEvent> {
       }
     }
   }
+}
+
+// ── feedback ──────────────────────────────────────────────────────────────────
+
+export async function submitFeedback(interactionId: number, rating: 1 | -1): Promise<void> {
+  await apiFetch(`/feedback/${interactionId}`, {
+    method: "POST",
+    body: JSON.stringify({ rating }),
+  });
+}
+
+// ── auth ──────────────────────────────────────────────────────────────────────
+
+export async function adminLogin(email: string, password: string): Promise<string> {
+  const data = await apiFetch<{ access_token: string }>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+  return data.access_token;
+}
+
+// ── analytics ─────────────────────────────────────────────────────────────────
+
+export async function fetchAdminStats(token: string): Promise<AdminStats> {
+  return apiFetch<AdminStats>("/analytics/stats", {
+    headers: authHeader(token),
+  });
+}
+
+export async function fetchGaps(token: string): Promise<GapItem[]> {
+  const data = await apiFetch<{ gaps: GapItem[] }>("/analytics/gaps", {
+    headers: authHeader(token),
+  });
+  return data.gaps;
+}
+
+export function gapsExportUrl(): string {
+  return `${BASE}/analytics/gaps/export`;
 }

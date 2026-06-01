@@ -9,6 +9,7 @@ interface FinalizePayload {
   confidence: number;
   low_confidence_warning: boolean;
   conflict_warning: ConflictWarning | null;
+  interaction_id: number | null;
 }
 
 interface ChatStore {
@@ -20,6 +21,7 @@ interface ChatStore {
   addAssistantPlaceholder: () => string;
   appendToken: (id: string, token: string) => void;
   finalizeAssistant: (id: string, payload: FinalizePayload) => void;
+  setFeedback: (id: string, rating: 1 | -1) => void;
   setStreaming: (v: boolean) => void;
   clearMessages: () => void;
 }
@@ -67,8 +69,18 @@ export const useChatStore = create<ChatStore>((set) => ({
               confidence: payload.confidence,
               low_confidence_warning: payload.low_confidence_warning,
               conflict_warning: payload.conflict_warning,
+              interaction_id: payload.interaction_id,
+              feedback: null,
             }
           : m
+      ),
+    }));
+  },
+
+  setFeedback: (id, rating) => {
+    set((s) => ({
+      messages: s.messages.map((m) =>
+        m.id === id ? { ...m, feedback: rating } : m
       ),
     }));
   },

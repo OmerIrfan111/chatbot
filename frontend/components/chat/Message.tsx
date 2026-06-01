@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, Check, Bot, User } from "lucide-react";
+import { Copy, Check, Bot, User, ThumbsUp, ThumbsDown } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -10,6 +10,8 @@ import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CitationChip } from "./CitationChip";
 import { TypingIndicator } from "./TypingIndicator";
+import { submitFeedback } from "@/lib/api";
+import { useChatStore } from "@/store/chat";
 import type { ChatMessage } from "@/lib/types";
 
 function ConfidenceBadge({ score }: { score: number }) {
@@ -17,7 +19,11 @@ function ConfidenceBadge({ score }: { score: number }) {
   const isMid  = score >= 0.70;
   const color  = isHigh ? "#16A34A" : isMid ? "#D97706" : "#DC2626";
   const bg     = isHigh ? "#F0FDF4" : isMid ? "#FFFBEB" : "#FEF2F2";
-  const label  = isHigh ? "High confidence" : isMid ? "Medium confidence" : "Low confidence — verify this answer";
+  const label  = isHigh
+    ? "High confidence — answer well-supported by documents"
+    : isMid
+    ? "Medium confidence — answer may be partially supported"
+    : "Low confidence — verify this answer against source documents";
 
   return (
     <Tooltip>
@@ -29,7 +35,7 @@ function ConfidenceBadge({ score }: { score: number }) {
           {Math.round(score * 100)}%
         </span>
       </TooltipTrigger>
-      <TooltipContent side="top" className="text-xs max-w-[180px] text-center">
+      <TooltipContent side="top" className="text-xs max-w-[200px] text-center">
         {label}
       </TooltipContent>
     </Tooltip>
@@ -51,6 +57,53 @@ function CopyButton({ text }: { text: string }) {
     >
       {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
     </button>
+  );
+}
+
+function FeedbackButtons({ message }: { message: ChatMessage }) {
+  const { setFeedback } = useChatStore();
+  const [loading, setLoading] = useState(false);
+
+  if (!message.interaction_id) return null;
+
+  const vote = async (rating: 1 | -1) => {
+    if (loading || message.feedback === rating) return;
+    setLoading(true);
+    try {
+      await submitFeedback(message.interaction_id!, rating);
+      setFeedback(message.id, rating);
+    } catch {
+      // Silently fail — feedback is non-critical
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+      <button
+        onClick={() => vote(1)}
+        aria-label="Helpful"
+        className={`p-1.5 rounded-md transition-all ${
+          message.feedback === 1
+            ? "text-emerald-600 bg-emerald-50"
+            : "text-[#CCCCCC] hover:text-emerald-500 hover:bg-[#F0F0F0]"
+        }`}
+      >
+        <ThumbsUp className="h-3.5 w-3.5" />
+      </button>
+      <button
+        onClick={() => vote(-1)}
+        aria-label="Not helpful"
+        className={`p-1.5 rounded-md transition-all ${
+          message.feedback === -1
+            ? "text-red-500 bg-red-50"
+            : "text-[#CCCCCC] hover:text-red-400 hover:bg-[#F0F0F0]"
+        }`}
+      >
+        <ThumbsDown className="h-3.5 w-3.5" />
+      </button>
+    </div>
   );
 }
 
@@ -139,10 +192,11 @@ export function Message({ message }: { message: ChatMessage }) {
           </div>
         )}
 
-        {/* Footer: confidence badge + copy + timestamp */}
+        {/* Footer: confidence + feedback + copy + timestamp */}
         {!isUser && !message.streaming && message.content && (
           <div className="flex items-center gap-2 px-1">
             {message.confidence !== undefined && <ConfidenceBadge score={message.confidence} />}
+            <FeedbackButtons message={message} />
             <CopyButton text={message.content} />
             <span className="text-[10px] text-[#CCCCCC] ml-auto">
               {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}

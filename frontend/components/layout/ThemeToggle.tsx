@@ -1,11 +1,20 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { motion, AnimatePresence } from "framer-motion";
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  // Avoid hydration mismatch — only render theme-aware icon on client
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted) {
+    return <div className="h-8 w-8 rounded-lg" aria-hidden />;
+  }
 
   return (
     <button

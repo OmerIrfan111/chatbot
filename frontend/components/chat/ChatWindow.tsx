@@ -33,7 +33,7 @@ export function ChatWindow({ hasDocuments }: ChatWindowProps) {
   }, [isStreaming, messages]);
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#EBEBEB]">
+    <div className="flex flex-col h-full min-h-0 bg-transparent">
       <div ref={containerRef} className="flex-1 overflow-y-auto scroll-smooth">
         {messages.length === 0 ? (
           <EmptyState onSuggestion={sendMessage} hasDocuments={hasDocuments} />

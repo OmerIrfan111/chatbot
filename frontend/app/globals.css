@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Studio palette ───────────────────────────────────────────────────────────
+   Warm, tinted neutrals (no pure black/white) + a single chartreuse accent.
+   Accent is a fill/glow color only, never text on light surfaces.            */
+
 @keyframes typing-bounce {
   0%, 60%, 100% { transform: translateY(0); }
   30%           { transform: translateY(-5px); }
@@ -17,30 +21,20 @@
   50%      { opacity: 1; }
 }
 
-@keyframes mx-float {
+/* Slow, weightless drift for the hero star and ambient glows. */
+@keyframes star-float {
   0%, 100% { transform: translateY(0) rotate(0deg); }
-  50%      { transform: translateY(-12px) rotate(6deg); }
+  50%      { transform: translateY(-14px) rotate(45deg); }
 }
 
-@keyframes mx-float-rev {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50%      { transform: translateY(12px) rotate(-6deg); }
+@keyframes glow-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(0, -24px, 0) scale(1.08); }
 }
 
-@keyframes mx-wiggle {
-  0%, 100% { transform: rotate(0deg); }
-  25%      { transform: rotate(8deg); }
-  75%      { transform: rotate(-8deg); }
-}
-
-@keyframes mx-bounce {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50%      { transform: translateY(-8px) scale(1.1); }
-}
-
-@keyframes mx-pulse-glow {
-  0%, 100% { box-shadow: 0 0 8px rgba(255,58,242,0.4); }
-  50%      { box-shadow: 0 0 20px rgba(255,58,242,0.8); }
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 @layer utilities {
@@ -48,42 +42,52 @@
   .animate-typing { animation: typing-bounce 1.2s ease-in-out infinite; }
   .animate-fade-scale { animation: fade-scale-in 0.2s ease-out; }
   .animate-pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
-  .animate-mx-float { animation: mx-float 4s ease-in-out infinite; }
-  .animate-mx-float-rev { animation: mx-float-rev 4s ease-in-out infinite; }
-  .animate-mx-wiggle { animation: mx-wiggle 2.5s ease-in-out infinite; }
-  .animate-mx-bounce { animation: mx-bounce 2s ease-in-out infinite; }
-  .animate-mx-pulse-glow { animation: mx-pulse-glow 2s ease-in-out infinite; }
+  .animate-star-float { animation: star-float 9s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+  .animate-glow-drift { animation: glow-drift 14s ease-in-out infinite; }
+  .animate-rise-in { animation: rise-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
-  .text-gradient-purple {
-    background: linear-gradient(90deg, #7134C9 0%, #C960D4 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+  /* Oversized display heading — tight, confident, editorial. */
+  .display-xl {
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 0.92;
   }
 }
 
 @layer base {
   :root {
-    --background: #EBEBEB;
-    --foreground: #1A1A1A;
-    --card: #FFFFFF;
-    --card-foreground: #1A1A1A;
-    --popover: #FFFFFF;
-    --popover-foreground: #1A1A1A;
-    --primary: #6B3AC6;
-    --primary-foreground: #FFFFFF;
-    --secondary: #F3F3F3;
-    --secondary-foreground: #1A1A1A;
-    --muted: #F3F3F3;
-    --muted-foreground: #888888;
-    --accent: #F3F3F3;
-    --accent-foreground: #1A1A1A;
-    --destructive: #EF4444;
-    --destructive-foreground: #FFFFFF;
-    --border: #E2E2E2;
-    --input: #FFFFFF;
-    --ring: #6B3AC6;
-    --radius: 0.75rem;
+    --bg:           oklch(0.965 0.006 110);   /* warm off-white canvas */
+    --surface:      oklch(0.995 0.003 110);   /* cards, bubbles, panels */
+    --surface-2:    oklch(0.945 0.006 110);   /* recessed / secondary fills */
+    --ink:          oklch(0.205 0.012 120);   /* near-black text */
+    --ink-soft:     oklch(0.50 0.012 120);    /* muted text */
+    --ink-faint:    oklch(0.66 0.010 120);    /* hints, placeholders */
+    --line:         oklch(0.905 0.006 120);   /* hairline borders */
+    --accent:       oklch(0.905 0.185 124);   /* chartreuse — fills & glows */
+    --accent-strong:oklch(0.855 0.195 124);   /* accent hover */
+    --accent-ink:   oklch(0.30 0.07 128);     /* text/icon on accent */
+    --accent-glow:  oklch(0.90 0.19 124 / 0.45);
+
+    /* shadcn token bridge (kept so existing components resolve) */
+    --background: var(--bg);
+    --foreground: var(--ink);
+    --card: var(--surface);
+    --card-foreground: var(--ink);
+    --popover: var(--surface);
+    --popover-foreground: var(--ink);
+    --primary: var(--ink);
+    --primary-foreground: oklch(0.98 0.004 110);
+    --secondary: var(--surface-2);
+    --secondary-foreground: var(--ink);
+    --muted: var(--surface-2);
+    --muted-foreground: var(--ink-soft);
+    --accent-foreground: var(--accent-ink);
+    --destructive: oklch(0.62 0.20 25);
+    --destructive-foreground: oklch(0.98 0.004 110);
+    --border: var(--line);
+    --input: var(--surface);
+    --ring: var(--accent);
+    --radius: 0.875rem;
   }
 
   * {
@@ -91,27 +95,39 @@
     outline-color: var(--ring);
   }
   body {
-    background-color: #EBEBEB;
-    color: #1A1A1A;
+    background-color: var(--bg);
+    color: var(--ink);
     font-family: var(--font-sans), sans-serif;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
   html { font-family: var(--font-sans), sans-serif; }
 
-  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #D1D1D1; border-radius: 99px; }
-  ::-webkit-scrollbar-thumb:hover { background: #AAAAAA; }
+  ::-webkit-scrollbar-thumb { background: oklch(0.84 0.006 120); border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: oklch(0.74 0.008 120); }
 
-  /* Smooth scroll for chat */
   .scroll-smooth {
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Selection color */
   ::selection {
-    background: #6B3AC620;
-    color: #1A1A1A;
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+
+  /* Respect reduced-motion: drop ambient + decorative movement. */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-typing,
+    .animate-pulse-dot,
+    .animate-star-float,
+    .animate-glow-drift,
+    .animate-rise-in,
+    .animate-fade-scale {
+      animation: none !important;
+    }
+    * { scroll-behavior: auto !important; }
   }
 }

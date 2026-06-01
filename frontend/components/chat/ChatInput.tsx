@@ -60,11 +60,11 @@ export function ChatInput({ onSend, isStreaming, disabled }: ChatInputProps) {
       <motion.div
         animate={{
           boxShadow: focused
-            ? "0 0 0 2px #6B3AC640, 0 4px 16px rgba(0,0,0,0.08)"
-            : "0 1px 4px rgba(0,0,0,0.06)",
+            ? "0 0 0 3px var(--accent-glow), 0 8px 28px rgba(20,20,16,0.10)"
+            : "0 1px 4px rgba(20,20,16,0.05)",
         }}
-        transition={{ duration: 0.15 }}
-        className="bg-white rounded-2xl border border-[#E2E2E2] overflow-hidden"
+        transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+        className="bg-[var(--surface)] rounded-[1.25rem] border border-[var(--line)] overflow-hidden"
       >
         <div className="flex items-start gap-3 px-5 pt-4 pb-2">
           <textarea
@@ -78,7 +78,7 @@ export function ChatInput({ onSend, isStreaming, disabled }: ChatInputProps) {
             placeholder={disabled ? "Upload a document to begin" : "Ask whatever you want..."}
             rows={1}
             disabled={isStreaming}
-            className="flex-1 resize-none bg-transparent text-sm text-[#1A1A1A] placeholder:text-[#AAAAAA] outline-none min-h-[24px] max-h-[180px] leading-6 py-0 disabled:cursor-not-allowed"
+            className="flex-1 resize-none bg-transparent text-sm text-[var(--ink)] placeholder:text-[var(--ink-faint)] outline-none min-h-[24px] max-h-[180px] leading-6 py-0 disabled:cursor-not-allowed"
             aria-label="Chat input"
           />
         </div>
@@ -101,7 +101,7 @@ export function ChatInput({ onSend, isStreaming, disabled }: ChatInputProps) {
           <button
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
-            className="flex items-center gap-1.5 text-xs text-[#888888] hover:text-[#1A1A1A] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 text-xs text-[var(--ink-soft)] hover:text-[var(--ink)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {uploading
               ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -117,7 +117,7 @@ export function ChatInput({ onSend, isStreaming, disabled }: ChatInputProps) {
                 initial={{ opacity: 0, width: 0 }}
                 animate={{ opacity: 1, width: "auto" }}
                 exit={{ opacity: 0, width: 0 }}
-                className="text-xs text-[#AAAAAA] tabular-nums overflow-hidden"
+                className="text-xs text-[var(--ink-faint)] tabular-nums overflow-hidden"
               >
                 {value.length}/{MAX_CHARS}
               </motion.span>
@@ -128,12 +128,12 @@ export function ChatInput({ onSend, isStreaming, disabled }: ChatInputProps) {
             onClick={handleSend}
             disabled={!canSend}
             aria-label={isStreaming ? "Streaming" : "Send"}
-            className="flex h-8 w-8 items-center justify-center rounded-full transition-all"
+            className="flex h-9 w-9 items-center justify-center rounded-full transition-all"
             style={{
-              background: canSend ? "#6B3AC6" : "#E2E2E2",
-              color: canSend ? "white" : "#AAAAAA",
+              background: canSend ? "var(--accent)" : "var(--surface-2)",
+              color: canSend ? "var(--accent-ink)" : "var(--ink-faint)",
             }}
-            whileHover={canSend ? { scale: 1.05 } : {}}
+            whileHover={canSend ? { scale: 1.06 } : {}}
             whileTap={canSend ? { scale: 0.92 } : {}}
           >
             {isStreaming

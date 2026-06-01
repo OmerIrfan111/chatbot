@@ -20,15 +20,15 @@ export function CitationChip({ source }: CitationChipProps) {
         onClick={() => setExpanded((v) => !v)}
         className={cn(
           "flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium w-full text-left transition-all",
-          "bg-[#F8F8F8] border-[#E2E2E2] hover:bg-[#F0F0F0] text-[#555555]"
+          "bg-[var(--surface-2)] border-[var(--line)] hover:border-[var(--ink)] text-[var(--ink-soft)]"
         )}
         aria-expanded={expanded}
       >
         <FileText className="h-3 w-3 shrink-0" style={{ color }} />
         <span className="truncate">{source.filename}</span>
-        <span className="ml-auto text-[10px] text-[#AAAAAA] shrink-0">p.{source.page}</span>
+        <span className="ml-auto text-[10px] text-[var(--ink-faint)] shrink-0">p.{source.page}</span>
         <ChevronDown
-          className="h-3 w-3 shrink-0 transition-transform text-[#CCCCCC]"
+          className="h-3 w-3 shrink-0 transition-transform text-[var(--ink-faint)]"
           style={{ transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}
         />
       </button>
@@ -42,7 +42,7 @@ export function CitationChip({ source }: CitationChipProps) {
             transition={{ duration: 0.18 }}
             className="overflow-hidden"
           >
-            <p className="mt-1 px-3 py-2 text-xs text-[#555555] bg-[#F8F8F8] rounded-lg border border-[#E2E2E2] leading-relaxed">
+            <p className="mt-1 px-3 py-2 text-xs text-[var(--ink-soft)] bg-[var(--surface-2)] rounded-lg border border-[var(--line)] leading-relaxed">
               {source.snippet}{source.snippet.length >= 200 && "…"}
             </p>
           </motion.div>

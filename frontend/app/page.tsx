@@ -13,7 +13,7 @@ export default function Home() {
   const [docsOpen, setDocsOpen] = useState(false);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#EBEBEB] relative">
+    <div className="flex h-screen overflow-hidden bg-transparent relative">
       <FloatingDecorations />
       <IconSidebar onFolderClick={() => setDocsOpen((v) => !v)} folderActive={docsOpen} />
       <DocumentPanel open={docsOpen} onClose={() => setDocsOpen(false)} />

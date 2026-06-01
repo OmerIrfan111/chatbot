@@ -17,7 +17,7 @@ export function DocumentList() {
   }
 
   if (documents.length === 0) {
-    return <p className="text-xs text-[#AAAAAA] text-center py-3">No documents yet.</p>;
+    return <p className="text-xs text-[var(--ink-faint)] text-center py-3">No documents yet.</p>;
   }
 
   return (
@@ -29,17 +29,17 @@ export function DocumentList() {
             initial={{ opacity: 0, x: -6 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -6, height: 0 }}
-            className="group flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-[#F3F3F3] transition-colors"
+            className="group flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-[var(--surface-2)] transition-colors"
           >
-            <FileText className="h-3.5 w-3.5 shrink-0 text-[#6B3AC6]" />
+            <FileText className="h-3.5 w-3.5 shrink-0 text-[var(--ink-soft)]" />
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-[#1A1A1A] truncate">{doc.filename}</p>
-              <p className="text-[10px] text-[#AAAAAA]">{doc.chunk_count} chunks</p>
+              <p className="text-xs font-medium text-[var(--ink)] truncate">{doc.filename}</p>
+              <p className="text-[10px] text-[var(--ink-faint)]">{doc.chunk_count} chunks</p>
             </div>
             <button
               onClick={() => deleteDoc(doc.id)}
               aria-label={`Remove ${doc.filename}`}
-              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:text-red-500 text-[#AAAAAA] transition-all"
+              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:text-red-500 text-[var(--ink-faint)] transition-all"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>

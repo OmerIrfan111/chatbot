@@ -33,7 +33,7 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#EBEBEB] p-4">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--bg)] p-4">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -50,7 +50,7 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-xl border border-[#E2E2E2] text-sm bg-[#FAFAFA] focus:outline-none focus:ring-2 focus:ring-[#6B3AC6]/20 focus:border-[#6B3AC6] transition-all"
+            className="w-full px-3 py-2.5 rounded-xl border border-[#E2E2E2] text-sm bg-[#FAFAFA] focus:outline-none focus:ring-2 focus:ring-[#1A1A1A]/20 focus:border-[#1A1A1A] transition-all"
             required
           />
           <input
@@ -58,7 +58,7 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-xl border border-[#E2E2E2] text-sm bg-[#FAFAFA] focus:outline-none focus:ring-2 focus:ring-[#6B3AC6]/20 focus:border-[#6B3AC6] transition-all"
+            className="w-full px-3 py-2.5 rounded-xl border border-[#E2E2E2] text-sm bg-[#FAFAFA] focus:outline-none focus:ring-2 focus:ring-[#1A1A1A]/20 focus:border-[#1A1A1A] transition-all"
             required
           />
           <AnimatePresence>
@@ -76,7 +76,7 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 rounded-xl bg-[#6B3AC6] text-white text-sm font-medium hover:bg-[#5B2DB8] transition-colors disabled:opacity-60"
+            className="w-full py-2.5 rounded-xl bg-[#1A1A1A] text-white text-sm font-medium hover:bg-[#0E0E0C] transition-colors disabled:opacity-60"
           >
             {loading ? "Signing in" : "Sign in"}
           </button>
@@ -215,7 +215,7 @@ function GapTable({ gaps, token }: { gaps: GapItem[]; token: string }) {
 }
 
 const CONFIDENCE_COLORS = { High: "#16A34A", Medium: "#D97706", Low: "#DC2626" };
-const FEEDBACK_COLORS = ["#6B3AC6", "#E2E2E2"];
+const FEEDBACK_COLORS = ["#1A1A1A", "#E2E2E2"];
 
 function Dashboard({ token, onLogout }: { token: string; onLogout: () => void }) {
   const [stats, setStats] = useState<AdminStats | null>(null);
@@ -249,12 +249,12 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#EBEBEB]">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg)]">
         <div className="flex gap-1.5">
           {[0, 1, 2].map((i) => (
             <motion.div
               key={i}
-              className="h-2 w-2 rounded-full bg-[#6B3AC6]"
+              className="h-2 w-2 rounded-full bg-[#1A1A1A]"
               animate={{ y: [0, -8, 0] }}
               transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
             />
@@ -266,10 +266,10 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#EBEBEB]">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg)]">
         <div className="text-center">
           <p className="text-sm text-red-500 mb-3">{error}</p>
-          <button onClick={load} className="text-sm text-[#6B3AC6] underline">Retry</button>
+          <button onClick={load} className="text-sm text-[#1A1A1A] underline">Retry</button>
         </div>
       </div>
     );
@@ -287,7 +287,7 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
   ] : [];
 
   return (
-    <div className="min-h-screen bg-[#EBEBEB]">
+    <div className="min-h-screen bg-[var(--bg)]">
       <header className="bg-white border-b border-[#E2E2E2] px-6 py-4 flex items-center justify-between">
         <div>
           <h1 className="text-base font-semibold text-[#1A1A1A]">Admin Dashboard</h1>
@@ -296,7 +296,7 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
         <div className="flex items-center gap-3">
           <button
             onClick={load}
-            className="text-xs text-[#6B3AC6] hover:underline"
+            className="text-xs text-[#1A1A1A] hover:underline"
           >
             Refresh
           </button>
@@ -311,7 +311,7 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
 
       <main className="max-w-6xl mx-auto px-4 md:px-6 py-6 flex flex-col gap-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard label="Questions today" value={stats?.questions_today ?? 0} icon={MessageSquare} color="#6B3AC6" />
+          <StatCard label="Questions today" value={stats?.questions_today ?? 0} icon={MessageSquare} color="#1A1A1A" />
           <StatCard label="Answer rate" value={`${Math.round((stats?.answer_rate ?? 0) * 100)}%`} sub="of questions answered" icon={CheckCircle} color="#16A34A" />
           <StatCard label="Avg confidence" value={`${Math.round((stats?.avg_confidence ?? 0) * 100)}%`} sub="on answered questions" icon={TrendingUp} color="#D97706" />
           <StatCard label="Total questions" value={stats?.total_questions ?? 0} icon={Activity} color="#0EA5E9" />
@@ -324,7 +324,7 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
             value={`$${(usage?.cost_usd ?? 0).toFixed(4)}`}
             sub="estimated LLM spend"
             icon={Coins}
-            color="#6B3AC6"
+            color="#1A1A1A"
           />
           <StatCard
             label="Total tokens"
@@ -359,7 +359,7 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                   <RechartTooltip
                     contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #E2E2E2", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
                   />
-                  <Line type="monotone" dataKey="count" stroke="#6B3AC6" strokeWidth={2} dot={{ r: 3, fill: "#6B3AC6" }} activeDot={{ r: 5 }} />
+                  <Line type="monotone" dataKey="count" stroke="#1A1A1A" strokeWidth={2} dot={{ r: 3, fill: "#1A1A1A" }} activeDot={{ r: 5 }} />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -415,7 +415,7 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
               </ResponsiveContainer>
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2 text-sm">
-                  <span className="h-2.5 w-2.5 rounded-full bg-[#6B3AC6]" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#1A1A1A]" />
                   <span className="text-[#1A1A1A]">Helpful</span>
                   <span className="font-semibold ml-2">{stats!.feedback.thumbs_up}</span>
                 </div>

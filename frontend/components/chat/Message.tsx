@@ -52,7 +52,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={copy}
-      className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-[#F0F0F0] text-[#AAAAAA] hover:text-[#555555] transition-all"
+      className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-[var(--surface-2)] text-[var(--ink-faint)] hover:text-[var(--ink-soft)] transition-all"
       aria-label="Copy"
     >
       {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
@@ -87,7 +87,7 @@ function FeedbackButtons({ message }: { message: ChatMessage }) {
         className={`p-1.5 rounded-md transition-all ${
           message.feedback === 1
             ? "text-emerald-600 bg-emerald-50"
-            : "text-[#CCCCCC] hover:text-emerald-500 hover:bg-[#F0F0F0]"
+            : "text-[var(--ink-faint)] hover:text-emerald-500 hover:bg-[var(--surface-2)]"
         }`}
       >
         <ThumbsUp className="h-3.5 w-3.5" />
@@ -98,7 +98,7 @@ function FeedbackButtons({ message }: { message: ChatMessage }) {
         className={`p-1.5 rounded-md transition-all ${
           message.feedback === -1
             ? "text-red-500 bg-red-50"
-            : "text-[#CCCCCC] hover:text-red-400 hover:bg-[#F0F0F0]"
+            : "text-[var(--ink-faint)] hover:text-red-400 hover:bg-[var(--surface-2)]"
         }`}
       >
         <ThumbsDown className="h-3.5 w-3.5" />
@@ -143,7 +143,7 @@ function EscalationOffer({ message }: { message: ChatMessage }) {
 
   return (
     <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl border text-xs"
-      style={{ background: "#F5F3FF", borderColor: "#DDD6FE", color: "#5B21B6" }}>
+      style={{ background: "var(--surface)", borderColor: "var(--line)", color: "var(--ink-soft)" }}>
       <span className="flex items-center gap-2">
         <LifeBuoy className="h-3.5 w-3.5 shrink-0" />
         Not quite what you needed? Talk to a human.
@@ -151,8 +151,8 @@ function EscalationOffer({ message }: { message: ChatMessage }) {
       <button
         onClick={handoff}
         disabled={state === "sending"}
-        className="shrink-0 px-2.5 py-1 rounded-lg font-semibold text-white transition-all disabled:opacity-60"
-        style={{ background: "#6B3AC6" }}
+        className="shrink-0 px-2.5 py-1 rounded-lg font-semibold transition-all disabled:opacity-60"
+        style={{ background: "var(--accent)", color: "var(--accent-ink)" }}
       >
         {state === "sending" ? "Connecting…" : "Talk to a human"}
       </button>
@@ -176,13 +176,13 @@ export function Message({ message }: { message: ChatMessage }) {
         className="shrink-0 h-7 w-7 rounded-full flex items-center justify-center mt-0.5 border"
         style={
           isUser
-            ? { background: "#F3F3F3", borderColor: "#E2E2E2" }
-            : { background: "#6B3AC6", borderColor: "#6B3AC6" }
+            ? { background: "var(--surface-2)", borderColor: "var(--line)" }
+            : { background: "var(--accent)", borderColor: "var(--accent)" }
         }
       >
         {isUser
-          ? <User className="h-3.5 w-3.5 text-[#555555]" />
-          : <Bot  className="h-3.5 w-3.5 text-white" />}
+          ? <User className="h-3.5 w-3.5 text-[var(--ink-soft)]" />
+          : <Bot  className="h-3.5 w-3.5 text-[var(--accent-ink)]" />}
       </div>
 
       <div className={`flex flex-col gap-1.5 max-w-[85%] min-w-0 ${isUser ? "items-end" : ""}`}>
@@ -194,22 +194,22 @@ export function Message({ message }: { message: ChatMessage }) {
             style={
               isUser
                 ? {
-                    background: "#F3F3F3",
-                    borderColor: "#E8E8E8",
+                    background: "var(--ink)",
+                    borderColor: "transparent",
                     borderRadius: "1rem 1rem 0.25rem 1rem",
                   }
                 : {
-                    background: "#FFFFFF",
-                    borderColor: "#E2E2E2",
+                    background: "var(--surface)",
+                    borderColor: "var(--line)",
                     borderRadius: "1rem 1rem 1rem 0.25rem",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+                    boxShadow: "0 1px 3px rgba(20,20,16,0.05)",
                   }
             }
           >
             {isUser ? (
-              <p className="whitespace-pre-wrap break-words text-[#1A1A1A]">{message.content}</p>
+              <p className="whitespace-pre-wrap break-words text-[var(--bg)]">{message.content}</p>
             ) : (
-              <div className="prose prose-sm max-w-none break-words text-[#1A1A1A]">
+              <div className="prose prose-sm max-w-none break-words text-[var(--ink)]">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
@@ -217,7 +217,7 @@ export function Message({ message }: { message: ChatMessage }) {
                       const match = /language-(\w+)/.exec(className || "");
                       return !match ? (
                         <code
-                          className="px-1 py-0.5 rounded text-xs font-mono bg-[#F3F3F3] border border-[#E2E2E2] text-[#6B3AC6]"
+                          className="px-1 py-0.5 rounded text-xs font-mono bg-[var(--surface-2)] border border-[var(--line)] text-[var(--ink)]"
                           {...props}
                         >
                           {children}
@@ -228,7 +228,7 @@ export function Message({ message }: { message: ChatMessage }) {
                             onClick={() => {
                               navigator.clipboard.writeText(String(children).replace(/\n$/, ""));
                             }}
-                            className="absolute top-2 right-2 opacity-0 group-hover/code:opacity-100 p-1 rounded bg-[#F3F3F3] hover:bg-[#E8E8E8] transition-all text-[#888888] hover:text-[#1A1A1A]"
+                            className="absolute top-2 right-2 opacity-0 group-hover/code:opacity-100 p-1 rounded bg-[var(--surface-2)] hover:bg-[var(--line)] transition-all text-[var(--ink-soft)] hover:text-[var(--ink)]"
                             aria-label="Copy code"
                           >
                             <Copy className="h-3 w-3" />
@@ -249,7 +249,7 @@ export function Message({ message }: { message: ChatMessage }) {
                   {message.content}
                 </ReactMarkdown>
                 {message.streaming && (
-                  <span className="inline-block w-0.5 h-4 bg-[#6B3AC6] ml-0.5 animate-pulse align-text-bottom" />
+                  <span className="inline-block w-0.5 h-4 bg-[var(--ink)] ml-0.5 animate-pulse align-text-bottom" />
                 )}
               </div>
             )}
@@ -262,7 +262,7 @@ export function Message({ message }: { message: ChatMessage }) {
             {message.confidence !== undefined && <ConfidenceBadge score={message.confidence} />}
             <FeedbackButtons message={message} />
             <CopyButton text={message.content} />
-            <span className="text-[10px] text-[#CCCCCC] ml-auto">
+            <span className="text-[10px] text-[var(--ink-faint)] ml-auto">
               {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
             </span>
           </div>
@@ -299,7 +299,7 @@ export function Message({ message }: { message: ChatMessage }) {
         {/* Citations */}
         {!isUser && !message.streaming && message.sources && message.sources.length > 0 && (
           <div className="flex flex-col gap-1 w-full px-1">
-            <p className="text-[10px] font-semibold text-[#AAAAAA] uppercase tracking-wider px-1">
+            <p className="text-[10px] font-semibold text-[var(--ink-faint)] uppercase tracking-wider px-1">
               Sources
             </p>
             {message.sources.map((s, i) => (

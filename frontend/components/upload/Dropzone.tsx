@@ -8,11 +8,11 @@ import { cn } from "@/lib/utils";
 import type { PendingUpload } from "@/lib/types";
 
 const STATUS_ICON = {
-  uploading:  <Loader2     className="h-3 w-3 animate-spin text-[#6B3AC6]" />,
+  uploading:  <Loader2     className="h-3 w-3 animate-spin text-[var(--ink)]" />,
   processing: <Loader2     className="h-3 w-3 animate-spin text-amber-500" />,
   ready:      <CheckCircle2 className="h-3 w-3 text-emerald-500" />,
   error:      <XCircle     className="h-3 w-3 text-red-500" />,
-  idle:       <File        className="h-3 w-3 text-[#AAAAAA]" />,
+  idle:       <File        className="h-3 w-3 text-[var(--ink-faint)]" />,
 };
 const STATUS_LABEL = {
   uploading: "Uploading…", processing: "Embedding…", ready: "Ready", error: "Failed", idle: "",
@@ -42,17 +42,17 @@ export function Dropzone({ onDrop, pending }: DropzoneProps) {
         className={cn(
           "flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-5 text-center cursor-pointer transition-all",
           isDragActive
-            ? "border-[#6B3AC6] bg-[#6B3AC6]/5"
-            : "border-[#DDDDE0] hover:border-[#6B3AC6]/40 hover:bg-[#F8F8FC]"
+            ? "border-[var(--accent)] bg-[var(--surface-2)]"
+            : "border-[var(--line)] hover:border-[var(--ink)] hover:bg-[var(--surface-2)]"
         )}
       >
         <input {...getInputProps()} />
-        <Upload className={cn("h-5 w-5", isDragActive ? "text-[#6B3AC6]" : "text-[#AAAAAA]")} />
+        <Upload className={cn("h-5 w-5", isDragActive ? "text-[var(--ink)]" : "text-[var(--ink-faint)]")} />
         <div>
-          <p className="text-xs font-semibold text-[#1A1A1A]">
+          <p className="text-xs font-semibold text-[var(--ink)]">
             {isDragActive ? "Drop to upload" : "Upload documents"}
           </p>
-          <p className="text-[10px] text-[#AAAAAA] mt-0.5">PDF, DOCX, CSV, MD, HTML, TXT</p>
+          <p className="text-[10px] text-[var(--ink-faint)] mt-0.5">PDF, DOCX, CSV, MD, HTML, TXT</p>
         </div>
       </div>
 
@@ -63,11 +63,11 @@ export function Dropzone({ onDrop, pending }: DropzoneProps) {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#F5F5F5] border border-[#E2E2E2] text-xs"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--surface-2)] border border-[var(--line)] text-xs"
           >
             {STATUS_ICON[item.status]}
-            <span className="flex-1 truncate text-[#1A1A1A]">{item.file.name}</span>
-            <span className="shrink-0 text-[#AAAAAA]">{STATUS_LABEL[item.status]}</span>
+            <span className="flex-1 truncate text-[var(--ink)]">{item.file.name}</span>
+            <span className="shrink-0 text-[var(--ink-faint)]">{STATUS_LABEL[item.status]}</span>
           </motion.div>
         ))}
       </AnimatePresence>

@@ -31,8 +31,8 @@ function SidebarIcon({
             className={cn(
               "flex h-9 w-9 items-center justify-center rounded-xl transition-colors",
               active
-                ? "bg-[#1A1A1A] text-white"
-                : "text-[#888888] hover:bg-[#E2E2E2] hover:text-[#1A1A1A]"
+                ? "bg-[var(--ink)] text-[var(--bg)]"
+                : "text-[var(--ink-soft)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
             )}
             aria-label={label}
           >
@@ -52,14 +52,14 @@ export function IconSidebar({ onFolderClick, folderActive }: IconSidebarProps) {
   const clearMessages = useChatStore((s) => s.clearMessages);
 
   return (
-    <aside className="flex flex-col items-center w-[60px] shrink-0 py-4 gap-1 bg-[#EBEBEB] border-r border-[#DCDCDC]">
-      {/* Logo */}
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1A1A1A] mb-3 shrink-0">
-        <svg viewBox="0 0 20 20" fill="none" className="h-5 w-5">
-          <circle cx="6"  cy="6"  r="2.2" fill="white" />
-          <circle cx="14" cy="6"  r="2.2" fill="white" />
-          <circle cx="6"  cy="14" r="2.2" fill="white" />
-          <circle cx="14" cy="14" r="2.2" fill="white" />
+    <aside className="relative z-10 flex flex-col items-center w-[60px] shrink-0 py-4 gap-1 bg-[var(--surface)] border-r border-[var(--line)]">
+      {/* Logo — 4-point star motif (ties to the hero) */}
+      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--ink)] mb-3 shrink-0">
+        <svg viewBox="0 0 20 20" className="h-4 w-4">
+          <path
+            d="M10 1 C 11 6 14 9 19 10 C 14 11 11 14 10 19 C 9 14 6 11 1 10 C 6 9 9 6 10 1 Z"
+            fill="var(--accent)"
+          />
         </svg>
       </div>
 

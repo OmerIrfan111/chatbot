@@ -322,7 +322,7 @@ User question: {question}
 ---
 
 ### Phase 6 — Advanced Retrieval & AI Features
-**Status:** `[ ] NOT STARTED`
+**Status:** `[x] COMPLETE`
 
 **Scope:**
 - Hybrid retrieval: dense (FAISS) + BM25 (rank_bm25)
@@ -333,11 +333,26 @@ User question: {question}
 - Human escalation handoff: offer "talk to a human" on low confidence; log a ticket
 
 **QA Gate:**
-- [ ] Hybrid + rerank outperforms dense-only on a keyword-heavy test query
-- [ ] Repeated question served from semantic cache (no extra LLM call)
-- [ ] Suggested questions are relevant to the uploaded docs
-- [ ] Non-English question answered in the same language
-- [ ] Low-confidence response offers human handoff and logs a ticket
+- [x] Hybrid + rerank outperforms dense-only on a keyword-heavy test query  (test_hybrid_surfaces_keyword_chunk_that_dense_misses)
+- [x] Repeated question served from semantic cache (no extra LLM call)  (test_repeated_question_served_from_cache asserts invoke call_count unchanged)
+- [x] Suggested questions are relevant to the uploaded docs  (test_suggestions_endpoint_returns_questions; sampled-context LLM gen, cached by index signature)
+- [x] Non-English question answered in the same language  (detect_language + per-language system instruction; test_detect_language_spanish)
+- [x] Low-confidence response offers human handoff and logs a ticket  (escalation_offered flag + /escalate Ticket; test_escalate_creates_ticket, test_ticket_persists_and_listed_for_admin)
+
+**Files added/changed (2026-06-02):**
+- `backend/app/retriever.py` — rewritten: `hybrid_retrieve` (dense cosine + BM25 via RRF), `_bm25_order`, `_reciprocal_rank_fusion`, `_dense_scores`; returns cosine scores so confidence/conflict still work
+- `backend/app/reranker.py` — optional cross-encoder (`maybe_rerank`); lazy import, off by default, graceful fallback when sentence-transformers absent
+- `backend/app/semantic_cache.py` — thread-safe per-session `SemanticCache` (cosine near-dup, FIFO eviction)
+- `backend/app/suggestions.py` — `generate_suggestions` (LLM over sampled chunks, cached by index signature), robust `_parse_questions`
+- `backend/app/chain.py` — `detect_language` (langdetect) + per-language system instruction; `escalation_offered` + `language` in responses
+- `backend/app/models.py` — `Ticket` table (human-escalation)
+- `backend/app/config.py` — hybrid/reranker/semantic-cache/escalation settings
+- `backend/app/main.py` — semantic cache in `/chat`; `GET /suggestions`, `POST /escalate`, `GET /tickets` (admin); version 0.5.0
+- `backend/requirements.txt` — `rank-bm25`, `langdetect` (sentence-transformers optional, kept out of default install)
+- `backend/tests/` — `test_retrieval.py`, `test_semantic_cache.py`, `test_phase6_features.py` (24 new tests; 75 total pass)
+- `frontend/components/chat/EmptyState.tsx` — fetches `/suggestions`, renders AI-generated starter chips with fallback
+- `frontend/components/chat/Message.tsx` — `EscalationOffer` ("Talk to a human" → `/escalate`)
+- `frontend/lib/{types,api}.ts`, `store/chat.ts`, `lib/hooks/useChat.ts` — `language` + `escalation_offered` plumbing, `fetchSuggestions`, `escalate`
 
 ---
 
@@ -442,14 +457,19 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 | Phase 4 | FK pragma added to test engine | SQLite CASCADE deletes require `PRAGMA foreign_keys=ON` per connection; test engine must register this listener explicitly |
 | Phase 5 | python-jose not installed | `python-jose[cryptography]` was in requirements.txt but not in the active Python environment; run `pip install python-jose[cryptography] passlib[bcrypt]` |
 | Phase 5 | JWT stored in localStorage | Acceptable for portfolio/demo; production would use httpOnly cookies |
+| Phase 6 | RRF fusion returns dense cosine scores (not RRF scores) | Confidence/conflict logic expects cosine in [0,1]; fusion only reorders, each chunk keeps its cosine from stored embeddings |
+| Phase 6 | Cross-encoder reranker off by default, lazy + optional | sentence-transformers pulls in torch (~heavy, slow CI); gated behind `RERANKER_ENABLED`, graceful fallback to fusion order when absent |
+| Phase 6 | Semantic cache keyed by (session, question-embedding), no history guard | Server memory always accumulates so a "no-history" guard would defeat caching; per-session scoping prevents cross-user leakage |
+| Phase 6 | Reset semantic_cache + suggestions cache per test in conftest | Both are process-wide singletons; under identical mock embeddings a stale entry would cross-contaminate the next test |
+| Phase 6 | Patch get_embeddings in app.main + get_chat_model in app.suggestions | New point-of-use from-imports need their own patches in mock_openai (same binding-at-import-time issue as Phase 4) |
 
 ---
 
 ## Current Status
 
-**Active Phase:** Phase 6 — Advanced Retrieval & AI Features  
-**Last Completed Phase:** Phase 5 — Admin Dashboard & Analytics (2026-06-01)  
-**Next Action:** Hybrid retrieval (FAISS + BM25), cross-encoder reranker, semantic caching, auto-suggested starter questions, language detection + multilingual answers, human escalation handoff.
+**Active Phase:** Phase 7 — Security, Multi-Tenancy & Scale  
+**Last Completed Phase:** Phase 6 — Advanced Retrieval & AI Features (2026-06-02)  
+**Next Action:** Enforce JWT/roles on all endpoints, multi-tenant doc + vector isolation by `tenant_id`, guardrails (PII redaction, profanity, prompt-injection defense), per-tenant/IP rate limiting, cost dashboard, document versioning + incremental re-index.
 
 ---
 

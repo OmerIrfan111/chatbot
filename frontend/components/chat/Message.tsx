@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, Check, Bot, User, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Copy, Check, Bot, User, ThumbsUp, ThumbsDown, LifeBuoy } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -10,7 +10,7 @@ import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CitationChip } from "./CitationChip";
 import { TypingIndicator } from "./TypingIndicator";
-import { submitFeedback } from "@/lib/api";
+import { submitFeedback, escalate } from "@/lib/api";
 import { useChatStore } from "@/store/chat";
 import type { ChatMessage } from "@/lib/types";
 
@@ -102,6 +102,59 @@ function FeedbackButtons({ message }: { message: ChatMessage }) {
         }`}
       >
         <ThumbsDown className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
+function EscalationOffer({ message }: { message: ChatMessage }) {
+  const sessionId = useChatStore((s) => s.sessionId);
+  const messages = useChatStore((s) => s.messages);
+  const [state, setState] = useState<"idle" | "sending" | "done">("idle");
+
+  const handoff = async () => {
+    if (state !== "idle") return;
+    setState("sending");
+    // The question is the user turn immediately preceding this answer.
+    const idx = messages.findIndex((m) => m.id === message.id);
+    const question = idx > 0 ? messages[idx - 1].content : message.content;
+    try {
+      await escalate({
+        session_id: sessionId,
+        question,
+        reason: "low_confidence",
+        interaction_id: message.interaction_id ?? null,
+      });
+      setState("done");
+    } catch {
+      setState("idle");
+    }
+  };
+
+  if (state === "done") {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 rounded-xl border text-xs"
+        style={{ background: "#F0FDF4", borderColor: "#BBF7D0", color: "#166534" }}>
+        <Check className="h-3.5 w-3.5 shrink-0" />
+        <span>Connected — a support specialist will follow up shortly.</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl border text-xs"
+      style={{ background: "#F5F3FF", borderColor: "#DDD6FE", color: "#5B21B6" }}>
+      <span className="flex items-center gap-2">
+        <LifeBuoy className="h-3.5 w-3.5 shrink-0" />
+        Not quite what you needed? Talk to a human.
+      </span>
+      <button
+        onClick={handoff}
+        disabled={state === "sending"}
+        className="shrink-0 px-2.5 py-1 rounded-lg font-semibold text-white transition-all disabled:opacity-60"
+        style={{ background: "#6B3AC6" }}
+      >
+        {state === "sending" ? "Connecting…" : "Talk to a human"}
       </button>
     </div>
   );
@@ -214,6 +267,11 @@ export function Message({ message }: { message: ChatMessage }) {
               Consider rephrasing or uploading more relevant documents.
             </span>
           </div>
+        )}
+
+        {/* Human-escalation offer (low confidence / refusal) */}
+        {!isUser && !message.streaming && message.escalation_offered && (
+          <EscalationOffer message={message} />
         )}
 
         {/* Conflict warning */}

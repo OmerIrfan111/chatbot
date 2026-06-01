@@ -21,9 +21,12 @@ from app.chain import REFUSAL, answer, answer_stream
 from app.config import get_settings
 from app.database import SessionLocal, init_db
 from app.ingest import ingest_file
+from app.llm import get_embeddings
 from app.memory import memory_store
-from app.models import Document, Feedback, Interaction
+from app.models import Document, Feedback, Interaction, Ticket
 from app.retriever import retrieve
+from app.semantic_cache import semantic_cache
+from app.suggestions import generate_suggestions
 from app.vectorstore import FAISSVectorStore
 
 settings = get_settings()
@@ -77,7 +80,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="AI Support Agent API (mutex)", version="0.4.0", lifespan=lifespan)
+app = FastAPI(title="AI Support Agent API (mutex)", version="0.5.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -233,6 +236,68 @@ async def analytics_gaps_export(_admin=Depends(get_current_admin)):
     )
 
 
+# ── suggestions (auto starter questions) ────────────────────────────────────────
+
+@app.get("/suggestions")
+async def suggestions(n: int = 4):
+    """Auto-generated starter questions for the current document set."""
+    store = get_store()
+    if store.index is None or store.index.ntotal == 0:
+        return {"suggestions": []}
+    return {"suggestions": generate_suggestions(store, n=n)}
+
+
+# ── escalation (human handoff) ──────────────────────────────────────────────────
+
+class EscalateRequest(BaseModel):
+    session_id: str = "default"
+    question: str
+    contact: str = ""
+    reason: str = "low_confidence"
+    interaction_id: Optional[int] = None
+
+
+@app.post("/escalate", status_code=201)
+async def escalate(req: EscalateRequest):
+    """Log a human-handoff ticket for an unanswered / low-confidence question."""
+    with SessionLocal() as db:
+        ticket = Ticket(
+            session_id=req.session_id,
+            question=req.question,
+            contact=req.contact,
+            reason=req.reason,
+            interaction_id=req.interaction_id,
+        )
+        db.add(ticket)
+        db.commit()
+        db.refresh(ticket)
+        return {
+            "ticket_id": ticket.id,
+            "status": ticket.status,
+            "message": "A support specialist will follow up shortly.",
+        }
+
+
+@app.get("/tickets")
+async def list_tickets(_admin=Depends(get_current_admin)):
+    with SessionLocal() as db:
+        rows = db.query(Ticket).order_by(Ticket.created_at.desc()).all()
+        return {
+            "tickets": [
+                {
+                    "id": t.id,
+                    "session_id": t.session_id,
+                    "question": t.question,
+                    "contact": t.contact,
+                    "reason": t.reason,
+                    "status": t.status,
+                    "created_at": t.created_at.isoformat() if t.created_at else None,
+                }
+                for t in rows
+            ]
+        }
+
+
 # ── chat ───────────────────────────────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
@@ -258,6 +323,25 @@ async def chat(req: ChatRequest):
     store = get_store()
     _require_docs(store)
     history = _get_history(req)
+
+    # Semantic cache: keyed by question embedding, scoped per session so one
+    # user's phrasing never returns another's answer.
+    cache_eligible = settings.semantic_cache_enabled
+    q_emb = None
+    if cache_eligible:
+        q_emb = get_embeddings().embed_query(req.question)
+        cached = semantic_cache.get(req.session_id, q_emb)
+        if cached is not None:
+            _record_turn(req.session_id, req.question, cached["answer"])
+            interaction_id = _log_interaction(
+                req.session_id,
+                req.question,
+                cached["answer"],
+                confidence=cached.get("confidence"),
+                low_confidence_warning=cached.get("low_confidence_warning", False),
+            )
+            return {**cached, "interaction_id": interaction_id}
+
     chunks = retrieve(req.question, store, k=5)
     result = answer(req.question, chunks, history)
     _record_turn(req.session_id, req.question, result["answer"])
@@ -268,6 +352,8 @@ async def chat(req: ChatRequest):
         confidence=result.get("confidence"),
         low_confidence_warning=result.get("low_confidence_warning", False),
     )
+    if cache_eligible and q_emb is not None:
+        semantic_cache.put(req.session_id, q_emb, result)
     return {**result, "interaction_id": interaction_id}
 
 

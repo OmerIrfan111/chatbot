@@ -23,6 +23,8 @@ export interface ChatMessage {
   conflict_warning?: ConflictWarning | null;
   interaction_id?: number | null;
   feedback?: 1 | -1 | null;
+  language?: string;
+  escalation_offered?: boolean;
   /** true while SSE tokens are still arriving */
   streaming?: boolean;
   timestamp: Date;
@@ -48,6 +50,9 @@ export interface ChatResponse {
   low_confidence_warning: boolean;
   conflict_warning: ConflictWarning | null;
   interaction_id: number | null;
+  language?: string;
+  escalation_offered?: boolean;
+  cached?: boolean;
 }
 
 export type SSEEvent =
@@ -59,8 +64,24 @@ export type SSEEvent =
       low_confidence_warning: boolean;
       conflict_warning: ConflictWarning | null;
       interaction_id: number | null;
+      language?: string;
+      escalation_offered?: boolean;
     }
   | { type: "error"; message: string };
+
+export interface EscalateRequest {
+  session_id?: string;
+  question: string;
+  contact?: string;
+  reason?: string;
+  interaction_id?: number | null;
+}
+
+export interface EscalateResponse {
+  ticket_id: number;
+  status: string;
+  message: string;
+}
 
 export type UploadStatus = "idle" | "uploading" | "processing" | "ready" | "error";
 

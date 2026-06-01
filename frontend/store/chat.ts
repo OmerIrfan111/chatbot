@@ -10,6 +10,8 @@ interface FinalizePayload {
   low_confidence_warning: boolean;
   conflict_warning: ConflictWarning | null;
   interaction_id: number | null;
+  language?: string;
+  escalation_offered?: boolean;
 }
 
 interface ChatStore {
@@ -70,6 +72,8 @@ export const useChatStore = create<ChatStore>((set) => ({
               low_confidence_warning: payload.low_confidence_warning,
               conflict_warning: payload.conflict_warning,
               interaction_id: payload.interaction_id,
+              language: payload.language,
+              escalation_offered: payload.escalation_offered,
               feedback: null,
             }
           : m

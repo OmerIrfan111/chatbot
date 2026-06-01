@@ -1,10 +1,15 @@
 import json
+import logging
 from collections.abc import AsyncGenerator
 
 from langchain.schema import HumanMessage, SystemMessage
 
+from app.config import get_settings
 from app.llm import get_chat_model
 from app.vectorstore import Chunk
+
+logger = logging.getLogger(__name__)
+settings = get_settings()
 
 REFUSAL = "I don't have enough information in the provided documents to answer that."
 CONFIDENCE_THRESHOLD = 0.70  # below this → low-confidence warning
@@ -14,8 +19,37 @@ SYSTEM_PROMPT = (
     "You are a helpful customer support assistant. "
     "Answer the user's question using ONLY the context provided below. "
     f'If the context does not contain enough information, say exactly: "{REFUSAL}" '
-    "Always cite sources by document name and page/section when you use them."
+    "Always cite sources by document name and page/section when you use them. "
+    "Always reply in the same language as the user's question."
 )
+
+# Map ISO 639-1 codes to human-readable names for a clearer instruction.
+_LANG_NAMES = {
+    "en": "English", "es": "Spanish", "fr": "French", "de": "German",
+    "it": "Italian", "pt": "Portuguese", "nl": "Dutch", "ru": "Russian",
+    "zh-cn": "Chinese", "zh-tw": "Chinese", "ja": "Japanese", "ko": "Korean",
+    "ar": "Arabic", "hi": "Hindi", "tr": "Turkish", "pl": "Polish",
+}
+
+
+def detect_language(text: str) -> str:
+    """Best-effort ISO 639-1 language code for the question; defaults to 'en'."""
+    try:
+        from langdetect import DetectorFactory, detect
+
+        DetectorFactory.seed = 0
+        return detect(text)
+    except Exception:
+        return "en"
+
+
+def _language_instruction(question: str) -> tuple[str, str]:
+    """Return (lang_code, extra system instruction)."""
+    lang = detect_language(question)
+    if lang == "en":
+        return lang, ""
+    name = _LANG_NAMES.get(lang, lang)
+    return lang, f" The user is writing in {name}; respond entirely in {name}."
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -108,15 +142,23 @@ def _detect_conflict(chunks: list[tuple[Chunk, float]]) -> dict | None:
     }
 
 
-def _build_response(answer_text: str, chunks: list[tuple[Chunk, float]]) -> dict:
+def _build_response(
+    answer_text: str,
+    chunks: list[tuple[Chunk, float]],
+    language: str = "en",
+) -> dict:
     confidence = _compute_confidence(chunks)
     conflict = _detect_conflict(chunks)
+    is_refusal = REFUSAL.lower() in answer_text.lower()
     return {
         "answer": answer_text,
         "sources": _build_sources(chunks),
         "confidence": confidence,
         "low_confidence_warning": confidence < CONFIDENCE_THRESHOLD,
         "conflict_warning": conflict,
+        "language": language,
+        # Offer a human handoff when we're not confident or had to refuse.
+        "escalation_offered": is_refusal or confidence < settings.escalation_threshold,
     }
 
 
@@ -128,6 +170,7 @@ def answer(
     chat_history: list[dict] | None = None,
 ) -> dict:
     """Run the grounding chain and return {answer, sources, confidence, warnings}."""
+    lang, lang_instruction = _language_instruction(question)
     user_content = (
         f"Context:\n{_build_context(chunks)}"
         f"{_build_history_text(chat_history)}"
@@ -135,11 +178,11 @@ def answer(
     )
     model = get_chat_model()
     response = model.invoke([
-        SystemMessage(content=SYSTEM_PROMPT),
+        SystemMessage(content=SYSTEM_PROMPT + lang_instruction),
         HumanMessage(content=user_content),
     ])
     answer_text = response.content if isinstance(response.content, str) else str(response.content)
-    return _build_response(answer_text, chunks)
+    return _build_response(answer_text, chunks, language=lang)
 
 
 async def answer_stream(
@@ -148,6 +191,7 @@ async def answer_stream(
     chat_history: list[dict] | None = None,
 ) -> AsyncGenerator[str, None]:
     """Yields SSE-formatted data strings for token-by-token streaming."""
+    lang, lang_instruction = _language_instruction(question)
     user_content = (
         f"Context:\n{_build_context(chunks)}"
         f"{_build_history_text(chat_history)}"
@@ -155,7 +199,7 @@ async def answer_stream(
     )
     model = get_chat_model()
     async for chunk in model.astream([
-        SystemMessage(content=SYSTEM_PROMPT),
+        SystemMessage(content=SYSTEM_PROMPT + lang_instruction),
         HumanMessage(content=user_content),
     ]):
         if chunk.content:
@@ -164,4 +208,13 @@ async def answer_stream(
     # Done event carries all metadata including warnings
     confidence = _compute_confidence(chunks)
     conflict = _detect_conflict(chunks)
-    yield f"data: {json.dumps({'type': 'done', 'sources': _build_sources(chunks), 'confidence': confidence, 'low_confidence_warning': confidence < CONFIDENCE_THRESHOLD, 'conflict_warning': conflict})}\n\n"
+    done = {
+        "type": "done",
+        "sources": _build_sources(chunks),
+        "confidence": confidence,
+        "low_confidence_warning": confidence < CONFIDENCE_THRESHOLD,
+        "conflict_warning": conflict,
+        "language": lang,
+        "escalation_offered": confidence < settings.escalation_threshold,
+    }
+    yield f"data: {json.dumps(done)}\n\n"

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Float, ForeignKey, Text
+from sqlalchemy import Float, ForeignKey, Integer, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -68,4 +68,19 @@ class Feedback(Base):
         ForeignKey("interactions.id", ondelete="CASCADE"), index=True, nullable=False
     )
     rating: Mapped[int] = mapped_column(nullable=False)  # 1 = thumbs up, -1 = thumbs down
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+
+
+class Ticket(Base):
+    """Human-escalation ticket raised when the bot can't answer confidently."""
+    __tablename__ = "tickets"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    session_id: Mapped[str] = mapped_column(index=True, nullable=False)
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    # Optional link back to the low-confidence interaction that triggered it.
+    interaction_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    contact: Mapped[str] = mapped_column(default="")  # email / phone, optional
+    reason: Mapped[str] = mapped_column(default="low_confidence")
+    status: Mapped[str] = mapped_column(default="open")  # open | resolved
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))

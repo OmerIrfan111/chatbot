@@ -22,6 +22,13 @@ langchain-text-splitters==0.3.8
 faiss-cpu==1.14.2
 chromadb==0.6.3
 
+# Hybrid retrieval + multilingual (Phase 6)
+rank-bm25==0.2.2
+langdetect==1.0.9
+# Optional cross-encoder reranker — install to enable RERANKER_ENABLED=true:
+#   pip install sentence-transformers
+# Left out of the default install to keep CI light (pulls in torch).
+
 # Document parsers
 pdfplumber==0.11.5
 python-docx==1.1.2

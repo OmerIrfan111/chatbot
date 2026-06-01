@@ -1,4 +1,13 @@
-import type { AdminStats, ChatRequest, ChatResponse, Document, GapItem, SSEEvent } from "./types";
+import type {
+  AdminStats,
+  ChatRequest,
+  ChatResponse,
+  Document,
+  EscalateRequest,
+  EscalateResponse,
+  GapItem,
+  SSEEvent,
+} from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -94,6 +103,22 @@ export async function* streamChat(req: ChatRequest): AsyncGenerator<SSEEvent> {
       }
     }
   }
+}
+
+// ── suggestions (auto starter questions) ──────────────────────────────────────
+
+export async function fetchSuggestions(n = 4): Promise<string[]> {
+  const data = await apiFetch<{ suggestions: string[] }>(`/suggestions?n=${n}`);
+  return data.suggestions;
+}
+
+// ── escalation (human handoff) ────────────────────────────────────────────────
+
+export async function escalate(req: EscalateRequest): Promise<EscalateResponse> {
+  return apiFetch<EscalateResponse>("/escalate", {
+    method: "POST",
+    body: JSON.stringify(req),
+  });
 }
 
 // ── feedback ──────────────────────────────────────────────────────────────────

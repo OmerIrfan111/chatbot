@@ -47,6 +47,8 @@ export function useChat() {
               low_confidence_warning: event.low_confidence_warning ?? false,
               conflict_warning: event.conflict_warning ?? null,
               interaction_id: event.interaction_id ?? null,
+              language: event.language,
+              escalation_offered: event.escalation_offered ?? false,
             });
           } else if (event.type === "error") {
             finalizeAssistant(assistantId, EMPTY_FINALIZE);

@@ -56,6 +56,13 @@ def _isolated_store(tmp_path):
     fresh_store = FAISSVectorStore(path=str(tmp_path / "faiss"))
     main_module._store = fresh_store  # get_store() returns this; no OldPath loading
 
+    # ── Reset process-wide Phase 6 caches so tests don't cross-contaminate ─
+    from app.semantic_cache import semantic_cache
+    import app.suggestions as suggestions_module
+
+    semantic_cache.clear()
+    suggestions_module.clear_cache()
+
     yield
 
     # ── Restore originals ─────────────────────────────────────────────────
@@ -77,11 +84,13 @@ def mock_openai():
         "According to the document, the answer is found in the provided context."
     )
 
-    # Patch at point-of-use so from-imports in chain/ingest/retriever are covered
+    # Patch at point-of-use so from-imports in each module are covered.
     with (
         patch("app.ingest.get_embeddings") as _emb1,
         patch("app.retriever.get_embeddings") as _emb2,
+        patch("app.main.get_embeddings") as _emb3,
         patch("app.chain.get_chat_model") as _chat,
+        patch("app.suggestions.get_chat_model") as _chat2,
     ):
         embeddings = MagicMock()
         embeddings.embed_documents.side_effect = lambda texts: [FAKE_EMBEDDING] * len(texts)
@@ -92,7 +101,9 @@ def mock_openai():
 
         _emb1.return_value = embeddings
         _emb2.return_value = embeddings
+        _emb3.return_value = embeddings
         _chat.return_value = chat
+        _chat2.return_value = chat
 
         ns = MagicMock()
         ns.embeddings = embeddings

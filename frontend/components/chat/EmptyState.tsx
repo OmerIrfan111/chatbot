@@ -1,14 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { RotateCcw, User, Mail, FileText, Sliders } from "lucide-react";
+import { RotateCcw, User, Mail, FileText, Sliders, Sparkles } from "lucide-react";
+import { fetchSuggestions } from "@/lib/api";
 
-const ALL_PROMPTS = [
-  { text: "Ask what a specific section of your document says", icon: <User className="h-5 w-5" /> },
-  { text: "Generate a summary of the uploaded document", icon: <Mail className="h-5 w-5" /> },
-  { text: "Find key information from your files in one paragraph", icon: <FileText className="h-5 w-5" /> },
-  { text: "How does this document answer a specific question?", icon: <Sliders className="h-5 w-5" /> },
+const CARD_ICONS = [
+  <User key="i0" className="h-5 w-5" />,
+  <Mail key="i1" className="h-5 w-5" />,
+  <FileText key="i2" className="h-5 w-5" />,
+  <Sliders key="i3" className="h-5 w-5" />,
+];
+
+const FALLBACK_PROMPTS = [
+  "Ask what a specific section of your document says",
+  "Generate a summary of the uploaded document",
+  "Find key information from your files in one paragraph",
+  "How does this document answer a specific question?",
 ];
 
 interface EmptyStateProps {
@@ -17,7 +25,25 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({ onSuggestion, hasDocuments }: EmptyStateProps) {
-  const [prompts, setPrompts] = useState(ALL_PROMPTS);
+  const [prompts, setPrompts] = useState<string[]>(FALLBACK_PROMPTS);
+  const [aiGenerated, setAiGenerated] = useState(false);
+
+  // Pull auto-suggested starter questions for the current document set.
+  useEffect(() => {
+    let cancelled = false;
+    if (!hasDocuments) return;
+    fetchSuggestions(4)
+      .then((qs) => {
+        if (!cancelled && qs.length > 0) {
+          setPrompts(qs);
+          setAiGenerated(true);
+        }
+      })
+      .catch(() => {/* keep fallback prompts */});
+    return () => {
+      cancelled = true;
+    };
+  }, [hasDocuments]);
 
   const refresh = () => {
     setPrompts((p) => [...p.slice(1), p[0]]);
@@ -82,7 +108,7 @@ export function EmptyState({ onSuggestion, hasDocuments }: EmptyStateProps) {
             transition={{ delay: 0.12, duration: 0.3 }}
             className="grid grid-cols-4 gap-3 mb-4"
           >
-            {prompts.map(({ text, icon }, i) => (
+            {prompts.map((text, i) => (
               <motion.button
                 key={text}
                 initial={{ opacity: 0, y: 8 }}
@@ -94,22 +120,32 @@ export function EmptyState({ onSuggestion, hasDocuments }: EmptyStateProps) {
                 className="flex flex-col justify-between text-left p-4 rounded-2xl bg-white border border-[#E8E8E8] hover:border-[#CCCCCC] hover:shadow-sm transition-all min-h-[110px]"
               >
                 <p className="text-xs font-medium text-[#1A1A1A] leading-relaxed">{text}</p>
-                <span className="text-[#CCCCCC] mt-3">{icon}</span>
+                <span className="text-[#CCCCCC] mt-3">{CARD_ICONS[i % CARD_ICONS.length]}</span>
               </motion.button>
             ))}
           </motion.div>
 
-          {/* Refresh */}
-          <motion.button
+          {/* Refresh / source hint */}
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.35 }}
-            onClick={refresh}
-            className="flex items-center gap-1.5 text-xs text-[#888888] hover:text-[#1A1A1A] transition-colors w-fit"
+            className="flex items-center gap-3"
           >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Refresh Prompts
-          </motion.button>
+            <button
+              onClick={refresh}
+              className="flex items-center gap-1.5 text-xs text-[#888888] hover:text-[#1A1A1A] transition-colors w-fit"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Refresh Prompts
+            </button>
+            {aiGenerated && (
+              <span className="flex items-center gap-1 text-xs text-[#A78BFA]">
+                <Sparkles className="h-3.5 w-3.5" />
+                Suggested from your documents
+              </span>
+            )}
+          </motion.div>
         </>
       )}
     </div>

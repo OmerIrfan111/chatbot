@@ -1,3 +1,6 @@
+import json
+from collections.abc import AsyncGenerator
+
 from langchain.schema import HumanMessage, SystemMessage
 
 from app.llm import get_chat_model
@@ -87,3 +90,36 @@ def answer(
         "sources": _build_sources(chunks),
         "confidence": _compute_confidence(chunks),
     }
+
+
+async def answer_stream(
+    question: str,
+    chunks: list[tuple[Chunk, float]],
+    chat_history: list[dict] | None = None,
+) -> AsyncGenerator[str, None]:
+    """Yields SSE-formatted data strings for token-by-token streaming."""
+    context = _build_context(chunks)
+
+    history_text = ""
+    if chat_history:
+        lines = [
+            f"{m['role'].capitalize()}: {m['content']}"
+            for m in (chat_history or [])[-10:]
+        ]
+        history_text = "\nConversation history:\n" + "\n".join(lines)
+
+    user_content = (
+        f"Context:\n{context}"
+        f"{history_text}"
+        f"\n\nUser question: {question}"
+    )
+
+    model = get_chat_model()
+    async for chunk in model.astream([
+        SystemMessage(content=SYSTEM_PROMPT),
+        HumanMessage(content=user_content),
+    ]):
+        if chunk.content:
+            yield f"data: {json.dumps({'type': 'token', 'content': chunk.content})}\n\n"
+
+    yield f"data: {json.dumps({'type': 'done', 'sources': _build_sources(chunks), 'confidence': _compute_confidence(chunks)})}\n\n"

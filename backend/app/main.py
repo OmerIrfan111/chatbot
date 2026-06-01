@@ -3,9 +3,10 @@ from typing import Optional
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app.chain import answer
+from app.chain import answer, answer_stream
 from app.config import get_settings
 from app.database import SessionLocal, init_db
 from app.ingest import ingest_file
@@ -121,3 +122,24 @@ async def chat(req: ChatRequest):
         )
     chunks = retrieve(req.question, store, k=5)
     return answer(req.question, chunks, req.chat_history)
+
+
+@app.post("/chat/stream")
+async def chat_stream(req: ChatRequest):
+    """Stream a grounded answer token-by-token via Server-Sent Events."""
+    store = get_store()
+    if store.index is None or store.index.ntotal == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="No documents ingested yet. Upload a document first.",
+        )
+    chunks = retrieve(req.question, store, k=5)
+    return StreamingResponse(
+        answer_stream(req.question, chunks, req.chat_history),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )

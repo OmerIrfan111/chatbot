@@ -1,24 +1,34 @@
+"use client";
+
+import { Sidebar } from "@/components/layout/Sidebar";
+import { ChatWindow } from "@/components/chat/ChatWindow";
+import { useDocuments } from "@/lib/hooks/useDocuments";
+
 export default function Home() {
+  const { documents } = useDocuments();
+  const hasDocuments = documents.length > 0;
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-background">
-      <div className="max-w-2xl w-full text-center space-y-6">
-        <div className="space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight">AI Support Agent</h1>
-          <p className="text-muted-foreground text-lg">
-            RAG-powered customer support — coming in Phase 2
-          </p>
-        </div>
-        <div className="grid grid-cols-2 gap-4 text-sm text-left">
-          <div className="rounded-lg border p-4 space-y-1">
-            <p className="font-medium">Phase 0</p>
-            <p className="text-muted-foreground">Foundations — ✅ complete</p>
+    <div className="flex h-screen overflow-hidden bg-background">
+      {/* Left sidebar */}
+      <Sidebar />
+
+      {/* Main chat area */}
+      <main className="flex-1 flex flex-col min-w-0 min-h-0">
+        {/* Top bar */}
+        <header className="flex items-center px-6 h-14 border-b border-border shrink-0">
+          <div className="flex items-center gap-2">
+            <h1 className="text-sm font-semibold text-foreground">Chat</h1>
+            {hasDocuments && (
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                {documents.length} doc{documents.length !== 1 ? "s" : ""} indexed
+              </span>
+            )}
           </div>
-          <div className="rounded-lg border p-4 space-y-1">
-            <p className="font-medium">Phase 1</p>
-            <p className="text-muted-foreground">Core RAG Loop — pending</p>
-          </div>
-        </div>
-      </div>
-    </main>
+        </header>
+
+        <ChatWindow hasDocuments={hasDocuments} />
+      </main>
+    </div>
   );
 }

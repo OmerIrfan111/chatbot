@@ -1,9 +1,18 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pathlib import Path
 from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Load .env regardless of the working directory the server is started from.
+# Order matters: the repo-root .env loads first, then backend/.env overrides it
+# if present. This way `cd backend && uvicorn ...` still finds the root .env.
+_BACKEND_DIR = Path(__file__).resolve().parents[1]
+_REPO_ROOT = _BACKEND_DIR.parent
+_ENV_FILES = (_REPO_ROOT / ".env", _BACKEND_DIR / ".env")
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_ENV_FILES, extra="ignore")
 
     # OpenAI
     openai_api_key: str = ""

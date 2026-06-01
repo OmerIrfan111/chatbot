@@ -192,6 +192,17 @@ async def upload(
         document_id = await ingest_file(file, store, tenant_id=principal.tenant_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        # Most often a missing/invalid OPENAI_API_KEY or an embeddings API failure.
+        import logging
+        logging.getLogger(__name__).exception("Upload failed")
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Failed to embed the document. Check that OPENAI_API_KEY is set and "
+                f"valid, and that the API is reachable. ({type(exc).__name__})"
+            ),
+        )
     return {"document_id": document_id, "filename": file.filename, "status": "ready"}
 
 

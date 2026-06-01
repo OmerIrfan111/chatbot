@@ -1,67 +1,71 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Float, DateTime, Text
-from sqlalchemy.orm import declarative_base
 from datetime import datetime, timezone
 
-Base = declarative_base()
+from sqlalchemy import Float, ForeignKey, Text
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+
+class Base(DeclarativeBase):
+    pass
 
 
 class Document(Base):
     __tablename__ = "documents"
 
-    id = Column(Integer, primary_key=True, index=True)
-    filename = Column(String, nullable=False)
-    content_type = Column(String, nullable=False, default="")
-    chunk_count = Column(Integer, default=0)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    filename: Mapped[str] = mapped_column(nullable=False)
+    content_type: Mapped[str] = mapped_column(nullable=False, default="")
+    chunk_count: Mapped[int] = mapped_column(default=0)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
 
 
 class ChunkMetadata(Base):
     """Persists chunk text + metadata so citations survive FAISS rebuilds."""
     __tablename__ = "chunk_metadata"
 
-    id = Column(Integer, primary_key=True, index=True)
-    document_id = Column(Integer, ForeignKey("documents.id", ondelete="CASCADE"), index=True, nullable=False)
-    chunk_index = Column(Integer, nullable=False)
-    page = Column(Integer, nullable=False, default=1)
-    text = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    document_id: Mapped[int] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    chunk_index: Mapped[int] = mapped_column(nullable=False)
+    page: Mapped[int] = mapped_column(nullable=False, default=1)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
 
 
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
-    id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(String, index=True, default="default")
-    role = Column(String, nullable=False)  # "user" | "assistant"
-    content = Column(Text, nullable=False)
-    confidence = Column(Float, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    session_id: Mapped[str] = mapped_column(index=True, default="default")
+    role: Mapped[str] = mapped_column(nullable=False)  # "user" | "assistant"
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    # Mapped[float] + explicit nullable=True avoids SQLAlchemy's union-type
+    # resolution (which crashes on Python 3.14); column still allows NULL.
+    confidence: Mapped[float] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
 
 
 class Interaction(Base):
     """Persists every Q&A turn for analytics and the admin dashboard."""
     __tablename__ = "interactions"
 
-    id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(String, index=True, nullable=False)
-    question = Column(Text, nullable=False)
-    answer = Column(Text, nullable=False)
-    confidence = Column(Float, nullable=True)
-    low_confidence_warning = Column(Boolean, default=False)
-    is_refusal = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    session_id: Mapped[str] = mapped_column(index=True, nullable=False)
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    answer: Mapped[str] = mapped_column(Text, nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=True)
+    low_confidence_warning: Mapped[bool] = mapped_column(default=False)
+    is_refusal: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
 
 
 class Feedback(Base):
     """Thumbs up (+1) / thumbs down (-1) per interaction."""
     __tablename__ = "feedback"
 
-    id = Column(Integer, primary_key=True, index=True)
-    interaction_id = Column(
-        Integer,
-        ForeignKey("interactions.id", ondelete="CASCADE"),
-        index=True,
-        nullable=False,
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    interaction_id: Mapped[int] = mapped_column(
+        ForeignKey("interactions.id", ondelete="CASCADE"), index=True, nullable=False
     )
-    rating = Column(Integer, nullable=False)  # 1 = thumbs up, -1 = thumbs down
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    rating: Mapped[int] = mapped_column(nullable=False)  # 1 = thumbs up, -1 = thumbs down
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))

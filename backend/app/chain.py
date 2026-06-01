@@ -138,7 +138,8 @@ def answer(
         SystemMessage(content=SYSTEM_PROMPT),
         HumanMessage(content=user_content),
     ])
-    return _build_response(response.content, chunks)
+    answer_text = response.content if isinstance(response.content, str) else str(response.content)
+    return _build_response(answer_text, chunks)
 
 
 async def answer_stream(

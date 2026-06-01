@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip,
-  ResponsiveContainer, Legend,
+  ResponsiveContainer,
 } from "recharts";
 import { LogOut, Download, MessageSquare, CheckCircle, TrendingUp, Activity } from "lucide-react";
 import { adminLogin, fetchAdminStats, fetchGaps, gapsExportUrl } from "@/lib/api";
@@ -423,7 +422,6 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
 
 export default function AdminPage() {
   const [token, setToken] = useState<string | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
     const stored = localStorage.getItem("admin_token");

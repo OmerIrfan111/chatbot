@@ -22,7 +22,7 @@ from app.config import get_settings
 from app.database import SessionLocal, init_db
 from app.ingest import ingest_file
 from app.memory import memory_store
-from app.models import ChunkMetadata, Document, Feedback, Interaction
+from app.models import Document, Feedback, Interaction
 from app.retriever import retrieve
 from app.vectorstore import FAISSVectorStore
 

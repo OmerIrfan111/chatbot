@@ -1,6 +1,7 @@
 from functools import lru_cache
 
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from pydantic import SecretStr
 
 from app.config import get_settings
 
@@ -11,7 +12,7 @@ settings = get_settings()
 def get_chat_model() -> ChatOpenAI:
     return ChatOpenAI(
         model=settings.openai_chat_model,
-        api_key=settings.openai_api_key,
+        api_key=SecretStr(settings.openai_api_key),
         temperature=0,
         streaming=True,
     )
@@ -21,5 +22,5 @@ def get_chat_model() -> ChatOpenAI:
 def get_embeddings() -> OpenAIEmbeddings:
     return OpenAIEmbeddings(
         model=settings.openai_embedding_model,
-        api_key=settings.openai_api_key,
+        api_key=SecretStr(settings.openai_api_key),
     )

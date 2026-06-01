@@ -70,7 +70,6 @@ def _ocr_fallback(data: bytes) -> list[ParsedPage]:
     """Attempt pytesseract OCR; flag gracefully if unavailable."""
     try:
         import pytesseract
-        from PIL import Image as PILImage
         import pdf2image  # type: ignore
 
         images = pdf2image.convert_from_bytes(data, dpi=200)
@@ -174,7 +173,6 @@ def _detect_and_parse(filename: str, content_type: str, data: bytes) -> list[Par
     if name.endswith(".txt") or mime.startswith("text/"):
         return _parse_txt(data)
 
-    ext = "." + name.rsplit(".", 1)[-1] if "." in name else ""
     raise ValueError(
         f"Unsupported file type '{filename}'. "
         f"Supported: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"
@@ -253,9 +251,9 @@ async def ingest_file(file: UploadFile, store: FAISSVectorStore) -> int:
                 text=chunk.text,
             ))
 
-        doc = db.get(Document, document_id)
-        if doc:
-            doc.chunk_count = len(chunks)
+        doc_row = db.get(Document, document_id)
+        if doc_row:
+            doc_row.chunk_count = len(chunks)
         db.commit()
 
     logger.info("Ingested '%s': %d pages, %d chunks", filename, len(pages), len(chunks))

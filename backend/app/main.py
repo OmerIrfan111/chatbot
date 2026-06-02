@@ -444,7 +444,7 @@ async def chat(req: ChatRequest, principal: Principal = Depends(rate_limit)):
             )
             return {**cached, "interaction_id": interaction_id}
 
-    chunks = retrieve(req.question, store, k=5)
+    chunks = retrieve(req.question, store, k=settings.retrieval_k)
     result = answer(req.question, chunks, history)
     prompt_text = req.question + " " + " ".join(c.text for c, _ in chunks)
     _record_turn(skey, req.question, result["answer"])
@@ -467,7 +467,7 @@ async def chat_stream(req: ChatRequest, principal: Principal = Depends(rate_limi
     store = get_store(tenant_id)
     _require_docs(store)
     history = _get_history(skey, req)
-    chunks = retrieve(req.question, store, k=5)
+    chunks = retrieve(req.question, store, k=settings.retrieval_k)
     prompt_text = req.question + " " + " ".join(c.text for c, _ in chunks)
 
     async def _stream_and_record():

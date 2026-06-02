@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     vector_store_type: str = "faiss"  # "faiss" | "chroma"
 
     # Retrieval (Phase 6)
+    retrieval_k: int = 8                   # chunks fed to the model per question
     hybrid_enabled: bool = True            # dense (FAISS) + BM25 fusion
     bm25_weight: float = 1.0               # RRF weight for the BM25 ranking
     dense_weight: float = 1.0              # RRF weight for the dense ranking

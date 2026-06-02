@@ -19,6 +19,7 @@ langchain==0.3.14
 langchain-openai==0.3.0
 langchain-community==0.3.14
 langchain-text-splitters==0.3.8
+langchain-aws==0.2.10        # AWS Bedrock provider (LLM_PROVIDER=bedrock)
 faiss-cpu==1.14.2
 chromadb==0.6.3
 

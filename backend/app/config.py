@@ -1,23 +1,39 @@
+import sys
 from pathlib import Path
 from functools import lru_cache
+from typing import Annotated
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # Load .env regardless of the working directory the server is started from.
 # Order matters: the repo-root .env loads first, then backend/.env overrides it
 # if present. This way `cd backend && uvicorn ...` still finds the root .env.
+# Under pytest we ignore .env files so tests run against deterministic defaults
+# (never the developer's real secrets/admin password).
 _BACKEND_DIR = Path(__file__).resolve().parents[1]
 _REPO_ROOT = _BACKEND_DIR.parent
-_ENV_FILES = (_REPO_ROOT / ".env", _BACKEND_DIR / ".env")
+_UNDER_PYTEST = "pytest" in sys.modules
+_ENV_FILES = None if _UNDER_PYTEST else (_REPO_ROOT / ".env", _BACKEND_DIR / ".env")
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=_ENV_FILES, extra="ignore")
 
+    # LLM provider: "openai" | "bedrock"
+    llm_provider: str = "openai"
+
     # OpenAI
     openai_api_key: str = ""
     openai_embedding_model: str = "text-embedding-3-small"
     openai_chat_model: str = "gpt-4o-mini"
+
+    # AWS Bedrock (used when llm_provider == "bedrock")
+    # The Bedrock API key maps to the standard AWS_BEARER_TOKEN_BEDROCK env var.
+    aws_bearer_token_bedrock: str = ""
+    aws_region: str = "us-east-1"
+    bedrock_chat_model: str = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
+    bedrock_embed_model: str = "amazon.titan-embed-text-v2:0"
 
     # Database
     database_url: str = "sqlite:///./data/app.db"
@@ -69,7 +85,19 @@ class Settings(BaseSettings):
 
     # App
     app_env: str = "development"
-    allowed_origins: list[str] = ["http://localhost:3000", "*"]  # wildcard for widget embed
+    # NoDecode: skip the source's JSON decode so a plain CSV string reaches the validator.
+    allowed_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000", "*"]
+
+    @field_validator("allowed_origins", mode="before")
+    @classmethod
+    def _split_csv(cls, v):
+        # Accept a comma-separated string (the natural .env format) or JSON list.
+        if isinstance(v, str):
+            s = v.strip()
+            if s.startswith("["):
+                return v  # let pydantic parse it as JSON
+            return [o.strip() for o in s.split(",") if o.strip()]
+        return v
 
 
 @lru_cache

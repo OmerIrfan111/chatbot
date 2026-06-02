@@ -58,6 +58,25 @@ def _language_instruction(question: str) -> tuple[str, str]:
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
+def _content_to_text(content) -> str:
+    """Normalize a model message's content to plain text.
+
+    OpenAI returns a string; Bedrock (Converse) returns a list of content
+    blocks like [{"type": "text", "text": "..."}]. Handle both.
+    """
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for block in content:
+            if isinstance(block, dict):
+                parts.append(block.get("text", "") or block.get("content", "") or "")
+            elif isinstance(block, str):
+                parts.append(block)
+        return "".join(parts)
+    return str(content) if content else ""
+
+
 def _build_history_text(chat_history: list[dict] | None) -> str:
     if not chat_history:
         return ""
@@ -189,7 +208,7 @@ def answer(
         SystemMessage(content=SYSTEM_PROMPT + lang_instruction),
         HumanMessage(content=user_content),
     ])
-    answer_text = response.content if isinstance(response.content, str) else str(response.content)
+    answer_text = _content_to_text(response.content)
     return _build_response(answer_text, chunks, language=lang)
 
 
@@ -210,8 +229,9 @@ async def answer_stream(
         SystemMessage(content=SYSTEM_PROMPT + lang_instruction),
         HumanMessage(content=user_content),
     ]):
-        if chunk.content:
-            yield f"data: {json.dumps({'type': 'token', 'content': chunk.content})}\n\n"
+        text = _content_to_text(chunk.content)
+        if text:
+            yield f"data: {json.dumps({'type': 'token', 'content': text})}\n\n"
 
     # Done event carries all metadata including warnings
     confidence = _compute_confidence(chunks)

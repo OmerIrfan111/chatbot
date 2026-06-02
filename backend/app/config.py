@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     # The Bedrock API key maps to the standard AWS_BEARER_TOKEN_BEDROCK env var.
     aws_bearer_token_bedrock: str = ""
     aws_region: str = "us-east-1"
-    bedrock_chat_model: str = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
+    bedrock_chat_model: str = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
     bedrock_embed_model: str = "amazon.titan-embed-text-v2:0"
 
     # Database
